@@ -47,7 +47,6 @@ void clusterFF::init() {
     }
 
     // traverse all PI pins.
-
     for (auto cur_pin : pi_vec) {
         // set the stack for DFS.
         std::stack<sequentialElement*> seq_stack;
