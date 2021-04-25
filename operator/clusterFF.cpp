@@ -60,47 +60,45 @@ void clusterFF::init() {
 
 void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
     if (stack.empty()) {
-        _log->warn("NO SEQUENTIALELEMENT HERE.", 0);
+        _log->error("NO SEQUENTIALELEMENT HERE.", 1);
         return;
     }
+
+    // sinks is pins of net's load.
+    vector<pin*> sinks;
+
+    // get current sequential element.
     sequentialElement* cur_seq = stack.top();
 
-    // if current element has been store. that stop.
-    for (auto cur_vertex : _graph->get_ff_vertexes()) {
-        if (cur_vertex->get_vertex()->get_name() == cur_seq->get_name()) {
-            return;
-        }
-    }
-
-    vector<pin*> sinks;
-    cell* begin_cell;
-    // if current is PI
     if (cur_seq->isPi()) {
+        // pinToSinkPins looking for load pins with given a driven pin.
         sinks = pinToSinkPins(cur_seq->get_pio_pin()->id);
     } else {
-        begin_cell = cur_seq->get_cell();
+        cell* begin_cell = cur_seq->get_cell();
         uint outpin_idx = cellToPin(begin_cell);
-        if (outpin_idx == UINT_MAX) {
+        if (outpin_idx == UINT_MAX) {  // The cell has no output pin.
             NOTIMING_END_CELL++;
             return;
-            // _log->error("CELL HAS NO OUTPUT PIN", 1);
         }
+
         sinks = pinToSinkPins(outpin_idx);
     }
 
+    // traverse all sink pins.
     for (auto sink_pin : sinks) {
         // PO case
         if (sink_pin->type == 2) {
-            sequentialElement* seq = new sequentialElement(sink_pin);  // PO
-            std::stack<sequentialElement*> copy_stack = stack;
             vector<cell*> edge_cells;
+            sequentialElement* sink_seq = new sequentialElement(sink_pin);
+            std::stack<sequentialElement*> copy_stack = stack;  // copy_stack for looking pair of Flipflops or Pis/Pos
+
             while (!copy_stack.empty()) {
-                sequentialElement* pre_seq = copy_stack.top();
-                if (pre_seq->isFlipFlop() || pre_seq->isPi()) {
-                    sequentialVertex* src_vertex = new sequentialVertex(pre_seq);
+                sequentialElement* src_seq = copy_stack.top();
+                if (src_seq->isFlipFlop() || src_seq->isPi()) {
+                    sequentialVertex* src_vertex = new sequentialVertex(src_seq);
                     _graph->add_vertex(src_vertex);
 
-                    sequentialVertex* sink_vertex = new sequentialVertex(seq);
+                    sequentialVertex* sink_vertex = new sequentialVertex(sink_seq);
                     _graph->add_vertex(sink_vertex);
 
                     sequentialArc* edge = new sequentialArc(src_vertex, sink_vertex);
@@ -110,7 +108,8 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
                     _graph->add_edge(edge);
                     return;
                 }
-                edge_cells.push_back(pre_seq->get_cell());
+                edge_cells.push_back(src_seq->get_cell());
+                deletePointer(src_seq);
                 copy_stack.pop();
             }
         }
@@ -118,17 +117,18 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
         // special case in ICCAD2015 contest.
         if (sink_pin->isFlopInput && stringToId(_cell_vec[sink_pin->owner]->ports, "q") == UINT_MAX) {
             NOOUTPUT_FLIPFLIP++;
-            cell* cur_cell = _cell_vec[sink_pin->owner];
-            sequentialElement* seq = new sequentialElement(cur_cell);  // FlipFlop
-            std::stack<sequentialElement*> copy_stack = stack;
             vector<cell*> edge_cells;
+            cell* sink_cell = _cell_vec[sink_pin->owner];
+            sequentialElement* sink_seq = new sequentialElement(sink_cell);  // FlipFlop
+            std::stack<sequentialElement*> copy_stack = stack;
+
             while (!copy_stack.empty()) {
-                sequentialElement* pre_seq = copy_stack.top();
-                if (pre_seq->isFlipFlop() || pre_seq->isPi()) {
-                    sequentialVertex* src_vertex = new sequentialVertex(pre_seq);
+                sequentialElement* src_seq = copy_stack.top();
+                if (src_seq->isFlipFlop() || src_seq->isPi()) {
+                    sequentialVertex* src_vertex = new sequentialVertex(src_seq);
                     _graph->add_vertex(src_vertex);
 
-                    sequentialVertex* sink_vertex = new sequentialVertex(seq);
+                    sequentialVertex* sink_vertex = new sequentialVertex(sink_seq);
                     _graph->add_vertex(sink_vertex);
 
                     sequentialArc* edge = new sequentialArc(src_vertex, sink_vertex);
@@ -138,13 +138,15 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
                     _graph->add_edge(edge);
                     return;
                 }
-                edge_cells.push_back(pre_seq->get_cell());
+                edge_cells.push_back(src_seq->get_cell());
+                deletePointer(src_seq);
+
                 copy_stack.pop();
             }
         }
 
-        cell* cur_cell = _cell_vec[sink_pin->owner];
-        sequentialElement* next_seq = new sequentialElement(cur_cell);
+        cell* sink_cell = _cell_vec[sink_pin->owner];
+        sequentialElement* next_seq = new sequentialElement(sink_cell);
 
         // avoid ring in graph
         bool is_existed = 0;

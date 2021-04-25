@@ -19,6 +19,7 @@
 
 #include "../evaluate.h"
 #include "../include/logger.h"
+#include "../include/utility.h"
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 

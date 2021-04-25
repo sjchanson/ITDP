@@ -20,3 +20,9 @@ double microtime() {
     gettimeofday(&tv, &tz);
     return tv.tv_sec + tv.tv_usec / 1000000.00;
 }
+
+template <typename T>
+void deletePointer(T* pointer) {
+    delete pointer;
+    pointer = nullptr;
+}
