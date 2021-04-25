@@ -3,3 +3,4 @@ build/
 *.spef
 *.timing
 *.tau2015
+.vscode/
