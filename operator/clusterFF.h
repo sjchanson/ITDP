@@ -49,5 +49,7 @@ private:
     Logger* _log;
     vector<sequentialElement*> _flipflop_pvec;
 
+    std::unordered_map<cell*, unsigned> _cell2Visited;
+
     void init();
 };

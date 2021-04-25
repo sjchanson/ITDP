@@ -40,6 +40,7 @@ public:
 
     void set_name(string name) { _name = name; }
     void set_ff() { _is_ff = 1; }
+    void set_visited() { _is_visited = 1; }
     void set_coord(coordinate coord) { _coord = coord; }
     void set_mode(FLIPFLOP_MODE mode) { _mode = mode; }
     void set_skew(double skew) { _skew = skew; }
@@ -52,11 +53,13 @@ public:
     unsigned isPi() const { return _is_pi; }
     unsigned isPo() const { return _is_po; }
     unsigned isFlipFlop() const { return _is_ff; }
+    unsigned isVisited() const { return _is_visited; }
 
 private:
     unsigned _is_pi : 1;
     unsigned _is_po : 1;
     unsigned _is_ff : 1;
+    unsigned _is_visited : 1;
     string _name;
     double _skew;
     coordinate _coord;

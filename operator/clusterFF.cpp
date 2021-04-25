@@ -52,6 +52,7 @@ void clusterFF::init() {
         std::stack<sequentialElement*> seq_stack;
         sequentialElement* pi = new sequentialElement(cur_pin);
         seq_stack.push(pi);
+        _cell2Visited.clear();
         ergodicGenerateGraph(seq_stack);
     }
     _log->printInt("Vertexes Count", _graph->get_ff_vertexes().size());
@@ -109,7 +110,6 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
                     return;
                 }
                 edge_cells.push_back(src_seq->get_cell());
-                deletePointer(src_seq);
                 copy_stack.pop();
             }
         }
@@ -139,48 +139,40 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
                     return;
                 }
                 edge_cells.push_back(src_seq->get_cell());
-                deletePointer(src_seq);
 
                 copy_stack.pop();
             }
         }
 
-        cell* sink_cell = _cell_vec[sink_pin->owner];
-        sequentialElement* next_seq = new sequentialElement(sink_cell);
+        auto& sink_cell = _cell_vec[sink_pin->owner];
 
-        // avoid ring in graph
-        bool is_existed = 0;
-        std::stack<sequentialElement*> copy_stack = stack;
-        while (!copy_stack.empty()) {
-            sequentialElement* tmp_seq = copy_stack.top();
-            if (next_seq->get_name() == tmp_seq->get_name()) {
-                is_existed = 1;
-                break;
-            }
-            copy_stack.pop();
+        // The sink_cell has already visited.
+        if (_cell2Visited.find(sink_cell) != _cell2Visited.end()) {
+            continue;
         }
-        if (!is_existed) {
-            // FlipFlop case
-            if (sink_pin->isFlopInput) {
-                next_seq->set_ff();
-                stack.push(next_seq);
-            } else {
-                // Logic cell case.
-                stack.push(next_seq);
-            }
+        _cell2Visited.emplace(sink_cell, 1);  // signed for avoiding ring in graph
 
-            // next recursive.
-            ergodicGenerateGraph(stack);
+        sequentialElement* sink_seq = new sequentialElement(sink_cell);
+
+        // FlipFlop case
+        if (sink_pin->isFlopInput) {
+            sink_seq->set_ff();
+            stack.push(sink_seq);
         } else {
-            return;
+            // Logic cell case.
+            stack.push(sink_seq);
         }
+
+        // next recursive.
+        ergodicGenerateGraph(stack);
     }
+
     sequentialElement* front_seq = stack.top();
     stack.pop();
 
     if (front_seq->isFlipFlop()) {
-        std::stack<sequentialElement*> copy_stack = stack;
         vector<cell*> edge_cells;
+        std::stack<sequentialElement*> copy_stack = stack;
         while (!copy_stack.empty()) {
             sequentialElement* pre_seq = copy_stack.top();
             if (pre_seq->isFlipFlop() || pre_seq->isPi()) {
