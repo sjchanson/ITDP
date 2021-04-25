@@ -1,2 +1,5 @@
 benchmark/
 build/
+*.spef
+*.timing
+*.tau2015
