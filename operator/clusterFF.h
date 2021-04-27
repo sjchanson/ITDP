@@ -11,7 +11,6 @@
 
 #pragma once
 
-#include <queue>
 #include <stack>
 #include <string>
 #include <unordered_map>
@@ -39,6 +38,8 @@ public:
 
     void ergodicGenerateGraph(std::stack<sequentialElement*>& stack);
 
+    sequentialVertex* makeVertex(sequentialElement* seq, int& flag);
+
 private:
     sequentialGraph* _graph;
     circuit* _circuit;
@@ -50,6 +51,8 @@ private:
     vector<sequentialElement*> _flipflop_pvec;
 
     std::unordered_map<cell*, unsigned> _cell2Visited;
+
+    std::unordered_map<std::string, uint> _vertex2Id;
 
     void init();
 };

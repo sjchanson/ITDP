@@ -59,8 +59,8 @@ void sequentialGraph::add_vertex(sequentialVertex* v) {
 
 void sequentialGraph::add_edge(sequentialArc* e) { _arcs.push_back(e); }
 
-void sequentialGraph::add_start_vertex(sequentialVertex* start_vertex) { _start_vertexes.emplace(start_vertex); }
+void sequentialGraph::add_start_vertex(sequentialVertex* start_vertex) { _start_vertexes.insert(start_vertex); }
 
-void sequentialGraph::add_end_vertex(sequentialVertex* end_vertex) { _end_vertexes.emplace(end_vertex); }
+void sequentialGraph::add_end_vertex(sequentialVertex* end_vertex) { _end_vertexes.insert(end_vertex); }
 
-void sequentialGraph::add_const_vertex(sequentialVertex* const_vertex) { _const_vertexes.emplace(const_vertex); }
+void sequentialGraph::add_const_vertex(sequentialVertex* const_vertex) { _const_vertexes.insert(const_vertex); }
