@@ -1,6 +1,6 @@
 #include "evaluate.h"
 #include "logger.h"
-#include "operator/clusterFF.h"
+#include "sequentialCluster/sequentialCluster.h"
 #include "utility.h"
 
 int main(int argc, char** argv) {
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
 
     // Cluster FlipFlop
     begin = microtime();
-    clusterFF* _cluster_ff = new clusterFF(_circuit, _log);
+    sequentialCluster* _cluster_ff = new sequentialCluster(_circuit, _log);
     end = microtime();
     _log->printTime("Init Flipflop topo", end - begin, 1);
 

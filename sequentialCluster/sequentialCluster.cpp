@@ -1,14 +1,15 @@
-#include "clusterFF.h"
+#include "sequentialCluster.h"
 
 #include <iostream>
 #include <mutex>
 #include <sstream>
 
-clusterFF::clusterFF() : _graph(nullptr), _circuit(nullptr), _log(nullptr) {}
+sequentialCluster::sequentialCluster() : _log(nullptr), _graph(nullptr), _circuit(nullptr) {}
 
-clusterFF::clusterFF(circuit* circuit, Logger* log) : clusterFF() {
+sequentialCluster::sequentialCluster(circuit* circuit, Logger* log) : sequentialCluster() {
     _circuit = circuit;
     _log = log;
+
     // get cells pointer.
     for (auto& cell : _circuit->getCells()) {
         _cell_vec.push_back(&cell);
@@ -38,119 +39,101 @@ clusterFF::clusterFF(circuit* circuit, Logger* log) : clusterFF() {
     init();
 }
 
-clusterFF::~clusterFF() = default;
+sequentialCluster::~sequentialCluster() {
+    _log = nullptr;
+    _graph = nullptr;
+    _circuit = nullptr;
 
-void clusterFF::init() {
+    for (auto& cell : _cell_vec) {
+        cell = nullptr;
+    }
+
+    for (auto& macro : _macro_vec) {
+        macro = nullptr;
+    }
+
+    for (auto& pin : _pin_vec) {
+        pin = nullptr;
+    }
+
+    for (auto& net : _net_vec) {
+        net = nullptr;
+    }
+
+    for (auto& flipflop : _flipflop_vec) {
+        flipflop = nullptr;
+    }
+}
+
+void sequentialCluster::init() {
     _graph = new sequentialGraph();
 
     vector<pin*> pi_vec;
     vector<pin*> po_vec;
-    int flipflop_cnt = 0;
 
-    // pick PI_PINS as our begin point.
     for (auto cur_pin : _pin_vec) {
-        // skip the "iccad_clk"
+        // skip the clock pin "iccad_clk"
         if (cur_pin->name == "iccad_clk") {
             continue;
         }
-        if (cur_pin->type == 1) {
-            // print
-            // _log->printItself(cur_pin->name, 0);
+        if (cur_pin->type == 1) {  // PI case.
             pi_vec.push_back(cur_pin);
         }
-        if (cur_pin->type == 2) {
-            // print
-            // _log->printItself(cur_pin->name, 0);
+        if (cur_pin->type == 2) {  // PO case.
             po_vec.push_back(cur_pin);
         }
-
-        if (cur_pin->isFlopInput && !cur_pin->isFlopCkPort) {
-            flipflop_cnt++;
-        }
     }
-
     _log->printInt("PI Count", pi_vec.size(), 1);
     _log->printInt("PO Count", po_vec.size(), 1);
-    _log->printInt("FlipFlop Count", flipflop_cnt, 1);
+    _log->printInt("FlipFlop Count", _flipflop_vec.size(), 1);
 
-    int lack_q_cnt = 0;
-    int lack_d_cnt = 0;
+    // special case in ICCAD2015 benchmark
+    // some filpflops have no output pin.
+    uint lack_q_cnt = 0;
     for (auto cur_pin : _pin_vec) {
         if (cur_pin->isFlopInput && !cur_pin->isFlopCkPort) {
             auto& cell = _cell_vec[cur_pin->owner];
             if (stringToId(cell->ports, "q") == UINT_MAX) {
-                // print
-                // _log->printItself(cell->name, 0);
                 lack_q_cnt++;
             }
-            if (stringToId(cell->ports, "d") == UINT_MAX) {
-                lack_d_cnt++;
-            }
         }
     }
+    _log->printInt("Lack of 'q port' Flipflop", lack_q_cnt, 1);
 
-    _log->printInt("Lack of 'q' Flipflop", lack_q_cnt, 1);
-    _log->printInt("Lack of 'd' Flipflop", lack_d_cnt, 1);
-
-    // traverse all PI pins.
     for (auto cur_pin : pi_vec) {
-        // set the stack for DFS.
-        std::stack<sequentialElement*> seq_stack;
+        std::stack<sequentialElement*> seq_stack;  // stack for DFS.
         sequentialElement* pi = new sequentialElement(cur_pin);
         seq_stack.push(pi);
-        _cell2Visited.clear();
-        ergodicGenerateGraph(seq_stack);
-        // print
-        // _log->printItself("ENDITER", 0);
+        _cell2Visited.clear();  // avoid repeated visits to the logic cells.
+
+        ergodicGenerateGraph(seq_stack);  // from the PI, traverse all paths to POs.
     }
 
-    // traver all not accessed flipflop
+    // special case in ICCAD2015 benchmark
+    // some flipflops do not come form PI
     for (auto flipflop : _flipflop_vec) {
-        if (_is_visited_ff[flipflop->name]) {
+        if (_is_visited_ff[flipflop->name]) {  // Ignore flipflops that have been visited.
             continue;
         }
-        // set the stack for DFS.
-        std::stack<sequentialElement*> seq_stack;
+        std::stack<sequentialElement*> seq_stack;  // stack for DFS.
         sequentialElement* ff = new sequentialElement(flipflop);
         ff->set_ff_pi();
         seq_stack.push(ff);
-        _cell2Visited.clear();
-        ergodicGenerateGraph(seq_stack);
+        _cell2Visited.clear();  // avoid repeated visits to the logic cells.
+
+        ergodicGenerateGraph(seq_stack);  // from the FlipFlop, traverse all paths to POs.
     }
 
-    _log->printInt("Vertexes Count", _graph->get_ff_vertexes().size(), 1);
-
-    uint v_pi = 0, v_po = 0, v_ff_pi = 0, v_ff_po = 0, v_ff = 0;
-
-    for (auto vertex : _graph->get_ff_vertexes()) {
-        if (vertex->get_vertex()->isFlipFlop()) {
-            v_ff++;
-        }
-        if (vertex->get_vertex()->isPi()) {
-            v_pi++;
-        }
-        if (vertex->get_vertex()->isFFPi()) {
-            v_ff_pi++;
-            v_ff++;
-        }
-        if (vertex->get_vertex()->isPo()) {
-            v_po++;
-        }
-        if (vertex->get_vertex()->isFFPo()) {
-            v_ff_po++;
-            v_ff++;
-        }
-    }
-    _log->printInt("Vertex:FlipFlop", v_ff, 1);
-    _log->printInt("Vertex:PI", v_pi, 1);
-    _log->printInt("Vertex:PO", v_po, 1);
-    _log->printInt("Vertex:PI(FF)", v_ff_pi, 1);
-    _log->printInt("Vertex:PO(FF)", v_ff_po, 1);
-
-    _log->printInt("Edges Count", _graph->get_ff_edges().size(), 1);
+    printGraphInfo();
 }
 
-void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
+/**
+ * @brief primary function.
+ * Use DFS to traverse all paths with a given PI(FlipFlop)
+ *
+ * @param stack
+ */
+void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
     if (stack.empty()) {
         _log->error("NO SEQUENTIALELEMENT HERE.", 1, 1);
         return;
@@ -159,9 +142,9 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
     // sinks is pins of net's load.
     vector<pin*> sinks;
 
-    // get current sequential element.
     sequentialElement* cur_seq = stack.top();
 
+    // the sequential element has already be a vetex in graph.
     if (_vertex2Id.find(cur_seq->get_name()) != _vertex2Id.end()) {
         stack.pop();  // must pop current FlipFlop element.
         addSequentialGraph(cur_seq, stack);
@@ -169,21 +152,20 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
     }
 
     if (cur_seq->isPi()) {
-        // pinToSinkPins looking for load pins with given a driven pin.
-        sinks = pinToSinkPins(cur_seq->get_pio_pin()->id);
+        pinToSinkPins(cur_seq->get_pio_pin()->id, sinks);
     } else {
         cell* begin_cell = cur_seq->get_cell();
-        uint outpin_idx = cellToPin(begin_cell);
-        if (outpin_idx == UINT_MAX) {  // The cell has no output pin.
+        vector<unsigned> outpins = cellToPins(begin_cell);
+        if (outpins.empty()) {
             return;
         }
-        sinks = pinToSinkPins(outpin_idx);
+        for (auto outpin_idx : outpins) {
+            pinToSinkPins(outpin_idx, sinks);
+        }
     }
 
-    // traverse all sink pins.
     for (auto sink_pin : sinks) {
-        // PO case
-        if (sink_pin->type == 2) {
+        if (sink_pin->type == 2) {  // PO case.
             sequentialElement* sink_seq = new sequentialElement(sink_pin);
             addSequentialGraph(sink_seq, stack);
             return;
@@ -194,11 +176,8 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
             stringToId(_cell_vec[sink_pin->owner]->ports, "q") == UINT_MAX) {
             cell* sink_cell = _cell_vec[sink_pin->owner];
 
-            // print
-            // _log->printItself(sink_cell->name, 0);
-
-            sequentialElement* sink_seq = new sequentialElement(sink_cell);  // FlipFlop
-            // must take care.
+            sequentialElement* sink_seq = new sequentialElement(sink_cell);
+            // treat it as PO processing
             sink_seq->set_ff_po();
             addSequentialGraph(sink_seq, stack);
             return;
@@ -210,24 +189,22 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
         if (_cell2Visited.find(sink_cell->name) != _cell2Visited.end()) {
             continue;
         }
-        _cell2Visited[sink_cell->name] = 1;  // signed for avoiding ring in graph
+        _cell2Visited[sink_cell->name] = 1;  // signed for avoiding ring in one traverse.
 
         sequentialElement* sink_seq = new sequentialElement(sink_cell);
 
-        // FlipFlop case
         if (sink_pin->isFlopInput && !sink_pin->isFlopCkPort) {
             sink_seq->set_ff();
             stack.push(sink_seq);
         } else {
-            // Logic cell case.
-            stack.push(sink_seq);
+            stack.push(sink_seq);  // Logic cell
         }
 
         // next recursive.
         ergodicGenerateGraph(stack);
     }
 
-    sequentialElement* sink_seq = stack.top();  // cur_seq has pushed a element.
+    sequentialElement* sink_seq = stack.top();  // get the latest sequential element.
 
     stack.pop();  // pop for advanced sequential element.
 
@@ -236,40 +213,65 @@ void clusterFF::ergodicGenerateGraph(std::stack<sequentialElement*>& stack) {
     }
 }
 
-vector<pin*> clusterFF::pinToSinkPins(unsigned pin_idx) {
+/**
+ * @brief Given a pin idx, Add the load pins.
+ *
+ * @param pin_idx
+ * @param pins
+ */
+void sequentialCluster::pinToSinkPins(unsigned pin_idx, vector<pin*>& pins) {
     net* cur_net = _net_vec[_pin_vec[pin_idx]->net];
     if (cur_net->source != pin_idx) {
         _log->error("Pass The ERROR Pin", 1, 1);
     }
-    vector<pin*> sinks;  // store the sink pins.
     for (auto sink_idx : cur_net->sinks) {
-        sinks.push_back(_pin_vec[sink_idx]);
+        pins.push_back(_pin_vec[sink_idx]);
     }
-    return sinks;
+    return;
 }
 
-unsigned clusterFF::cellToPin(cell* cell) {
+/**
+ * @brief Given a cell, Return its output pins.
+ *
+ * @param cell
+ * @return vector<unsigned>
+ */
+vector<unsigned> sequentialCluster::cellToPins(cell* cell) {
+    vector<unsigned> outpins;
     std::map<string, unsigned>::iterator iter;
     for (iter = cell->ports.begin(); iter != cell->ports.end(); iter++) {
         uint port_idx = iter->second;
         net* net = _net_vec[_pin_vec[port_idx]->net];
         if (net->source == port_idx) {
-            return port_idx;
+            outpins.push_back(port_idx);
         }
     }
-    return UINT_MAX;
+    return outpins;
 }
 
-uint clusterFF::stringToId(map<string, unsigned> port_map, string port_name) {
+/**
+ * @brief Given a map and key, Return the value.
+ *
+ * @param port_map
+ * @param port_name
+ * @return uint
+ */
+uint sequentialCluster::stringToId(map<string, unsigned> port_map, string port_name) {
     auto cur_object = port_map.find(port_name);
     if (cur_object == port_map.end()) {
-        // _log->error("PORT " + port_name + " NOT FOUND", 1);
         return UINT_MAX;
     }
     return cur_object->second;
 }
 
-sequentialVertex* clusterFF::makeVertex(sequentialElement* seq, bool& flag) {
+/**
+ * @brief Return a vertex objcect with a sequential element. flag is true when create a new object.
+ *
+ * @param seq
+ * @param flag
+ * @return sequentialVertex*
+ */
+sequentialVertex* sequentialCluster::makeVertex(sequentialElement* seq, bool& flag) {
     auto v = _vertex2Id.find(seq->get_name());
     if (v == _vertex2Id.end()) {
         _vertex2Id[seq->get_name()] = _graph->get_ff_vertexes().size();
@@ -288,7 +290,15 @@ sequentialVertex* clusterFF::makeVertex(sequentialElement* seq, bool& flag) {
     }
 }
 
-bool clusterFF::addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack) {
+/**
+ * @brief Given a sink sequential element, Find its forward src sequential element. And make Graph.
+ *
+ * @param sink_seq
+ * @param stack
+ * @return true
+ * @return false
+ */
+bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack) {
     if (!sink_seq || stack.empty()) {
         _log->error("ERROR in addGraph", 1, 1);
         return false;
@@ -305,18 +315,12 @@ bool clusterFF::addSequentialGraph(sequentialElement* sink_seq, std::stack<seque
             if (flag1) {
                 src_vertex->set_idx(_graph->get_ff_vertexes().size());
                 _graph->add_vertex(src_vertex);
-
-                // print
-                // _log->printItself(src_seq->get_name(), 0);
             }
 
             sequentialVertex* sink_vertex = makeVertex(sink_seq, flag2);
             if (flag2) {
                 sink_vertex->set_idx(_graph->get_ff_vertexes().size());
                 _graph->add_vertex(sink_vertex);
-
-                // print
-                // _log->printItself(sink_seq->get_name(), 0);
             }
 
             if (flag1 || flag2) {
@@ -363,11 +367,44 @@ bool clusterFF::addSequentialGraph(sequentialElement* sink_seq, std::stack<seque
     return false;
 }
 
-void clusterFF::modifyVisitedFFMap(std::string key, bool value) {
+void sequentialCluster::modifyVisitedFFMap(std::string key, bool value) {
     auto iter = _is_visited_ff.find(key);
     if (iter == _is_visited_ff.end()) {
         _log->error("Error occur in ff map", 1, 0);
     } else {
         iter->second = value;
     }
+}
+
+void sequentialCluster::printGraphInfo() {
+    _log->printInt("Vertexes Count", _graph->get_ff_vertexes().size(), 1);
+
+    uint v_pi = 0, v_po = 0, v_ff_pi = 0, v_ff_po = 0, v_ff = 0;
+
+    for (auto vertex : _graph->get_ff_vertexes()) {
+        if (vertex->get_vertex()->isFlipFlop()) {
+            v_ff++;
+        }
+        if (vertex->get_vertex()->isPi()) {
+            v_pi++;
+        }
+        if (vertex->get_vertex()->isFFPi()) {
+            v_ff_pi++;
+            v_ff++;
+        }
+        if (vertex->get_vertex()->isPo()) {
+            v_po++;
+        }
+        if (vertex->get_vertex()->isFFPo()) {
+            v_ff_po++;
+            v_ff++;
+        }
+    }
+    _log->printInt("Vertex:FlipFlop", v_ff, 1);
+    _log->printInt("Vertex:PI", v_pi, 1);
+    _log->printInt("Vertex:PO", v_po, 1);
+    _log->printInt("Vertex:PI(FF)", v_ff_pi, 1);
+    _log->printInt("Vertex:PO(FF)", v_ff_po, 1);
+
+    _log->printInt("Edges Count", _graph->get_ff_edges().size(), 1);
 }

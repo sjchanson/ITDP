@@ -22,38 +22,36 @@
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 
-class clusterFF {
+class sequentialCluster {
 public:
-    clusterFF();
-    clusterFF(circuit* circuit, Logger* log);
-    ~clusterFF();
+    sequentialCluster();
+    sequentialCluster(circuit* circuit, Logger* log);
+    ~sequentialCluster();
 
+    void pinToSinkPins(unsigned pin_idx, vector<pin*>& pins);
+    vector<unsigned> cellToPins(cell* cell);
     uint stringToId(map<string, unsigned> port_map, string port_name);
 
-    vector<pin*> pinToSinkPins(unsigned pin_idx);
-    unsigned cellToPin(cell* cell);
-
-    void ergodicGenerateGraph(std::stack<sequentialElement*>& stack);
-    sequentialVertex* makeVertex(sequentialElement* seq, bool& flag);
-    bool addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack);
-
 private:
+    Logger* _log;
     sequentialGraph* _graph;
     circuit* _circuit;
     vector<cell*> _cell_vec;
     vector<macro*> _macro_vec;
     vector<pin*> _pin_vec;
     vector<net*> _net_vec;
-    Logger* _log;
-
     vector<cell*> _flipflop_vec;
+
     std::unordered_map<std::string, bool> _is_visited_ff;
-
     std::unordered_map<std::string, unsigned> _cell2Visited;
-
     std::unordered_map<std::string, uint> _vertex2Id;
 
     void init();
 
     void modifyVisitedFFMap(std::string key, bool value);
+
+    sequentialVertex* makeVertex(sequentialElement* seq, bool& flag);
+    bool addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack);
+    void ergodicGenerateGraph(std::stack<sequentialElement*>& stack);
+    void printGraphInfo();
 };
