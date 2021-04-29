@@ -317,13 +317,18 @@ bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::sta
                 _graph->add_vertex(src_vertex);
             }
 
+            // add sequential element's direct predecessor
+            sink_seq->add_predecessor(src_seq);
+
+            if (sink_seq->get_predecessors().size() > 1) {
+                cout << "test" << endl;
+
+            }
+
             sequentialVertex* sink_vertex = makeVertex(sink_seq, flag2);
             if (flag2) {
                 sink_vertex->set_idx(_graph->get_ff_vertexes().size());
                 _graph->add_vertex(sink_vertex);
-
-                // add sequential element's direct predecessor
-                sink_seq->set_predecessor(src_seq);
             }
 
             if (flag1 || flag2) {

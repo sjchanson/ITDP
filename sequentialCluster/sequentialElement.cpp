@@ -18,7 +18,6 @@ sequentialElement::sequentialElement()
     , _coord(INT_MAX, INT_MAX)
     , _pio_pin(nullptr)
     , _cell(nullptr)
-    , _predecessor(nullptr)
     , _belonging_clus(nullptr) {}
 
 sequentialElement::sequentialElement(pin* p_pin) : sequentialElement() {
@@ -39,7 +38,4 @@ sequentialElement::sequentialElement(cell* cell) : sequentialElement() {
     set_coord(coordinate(cell->x_coord, cell->y_coord));
 }
 
-sequentialElement::~sequentialElement() {
-    _predecessor = nullptr;
-    _belonging_clus = nullptr;
-}
+sequentialElement::~sequentialElement() { _belonging_clus = nullptr; }

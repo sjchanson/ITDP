@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <unordered_set>
+
 #include "../evaluate.h"
 
 class cluster;
@@ -34,7 +36,7 @@ public:
     string get_name() const { return _name; }
     double get_skew() const { return _skew; }
     coordinate get_coord() const { return _coord; }
-    sequentialElement* get_predecessor() const { return _predecessor; }
+    std::unordered_set<sequentialElement*> get_predecessors() const { return _predecessors; }
     cluster* get_clus() const { return _belonging_clus; }
 
     void set_name(string name) { _name = name; }
@@ -43,7 +45,7 @@ public:
     void set_ff() { _is_ff = 1; }
     void set_coord(coordinate coord) { _coord = coord; }
     void set_skew(double skew) { _skew = skew; }
-    void set_predecessor(sequentialElement* ff) { _predecessor = ff; }
+    void add_predecessor(sequentialElement* ff) { _predecessors.insert(ff); }
     void set_clus(cluster* clus) { _belonging_clus = clus; }
 
     pin* get_pio_pin() const { return _pio_pin; }
@@ -67,7 +69,7 @@ private:
 
     pin* _pio_pin;
     cell* _cell;
-    sequentialElement* _predecessor;
+    std::unordered_set<sequentialElement*> _predecessors;
     cluster* _belonging_clus;
 };
 
