@@ -1,3 +1,5 @@
+
+
 /**
  * @file sequentialElement.h
  * @author SJchan (13560469332@163.com)
@@ -14,8 +16,6 @@
 #include "../evaluate.h"
 
 class cluster;
-
-enum FLIPFLOP_MODE { FAST, SLOW, NEUTRAL };
 
 struct coordinate {
     int x;
@@ -34,7 +34,6 @@ public:
     string get_name() const { return _name; }
     double get_skew() const { return _skew; }
     coordinate get_coord() const { return _coord; }
-    FLIPFLOP_MODE get_mode() const { return _mode; }
     sequentialElement* get_predecessor() const { return _predecessor; }
     cluster* get_clus() const { return _belonging_clus; }
 
@@ -42,9 +41,7 @@ public:
     void set_ff_pi() { _is_ff_pi = 1; }
     void set_ff_po() { _is_ff_po = 1; }
     void set_ff() { _is_ff = 1; }
-    void set_visited() { _is_visited = 1; }
     void set_coord(coordinate coord) { _coord = coord; }
-    void set_mode(FLIPFLOP_MODE mode) { _mode = mode; }
     void set_skew(double skew) { _skew = skew; }
     void set_predecessor(sequentialElement* ff) { _predecessor = ff; }
     void set_clus(cluster* clus) { _belonging_clus = clus; }
@@ -57,7 +54,6 @@ public:
     unsigned isFFPo() const { return _is_ff_po; }
     unsigned isPo() const { return _is_po; }
     unsigned isFlipFlop() const { return _is_ff; }
-    unsigned isVisited() const { return _is_visited; }
 
 private:
     unsigned _is_pi : 1;
@@ -65,12 +61,10 @@ private:
     unsigned _is_po : 1;
     unsigned _is_ff_po : 1;
     unsigned _is_ff : 1;
-    unsigned _is_visited : 1;
     string _name;
     double _skew;
     coordinate _coord;
 
-    FLIPFLOP_MODE _mode;
     pin* _pio_pin;
     cell* _cell;
     sequentialElement* _predecessor;

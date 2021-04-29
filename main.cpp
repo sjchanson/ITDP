@@ -41,5 +41,7 @@ int main(int argc, char** argv) {
     end = microtime();
     _log->printTime("Init Flipflop topo", end - begin, 1);
 
+    
+
     return 0;
 }

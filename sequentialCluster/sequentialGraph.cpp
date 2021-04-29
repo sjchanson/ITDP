@@ -44,10 +44,10 @@ sequentialGraph::~sequentialGraph() {
 }
 
 void sequentialGraph::add_vertex(sequentialVertex* v) {
-    if (v->get_vertex()->isPi()) {
+    if (v->get_vertex()->isPi() || v->get_vertex()->isFFPi()) {
         v->set_start();
         add_start_vertex(v);
-    } else if (v->get_vertex()->isPo()) {
+    } else if (v->get_vertex()->isPo() || v->get_vertex()->isFFPo()) {
         v->set_end();
         add_end_vertex(v);
     } else {

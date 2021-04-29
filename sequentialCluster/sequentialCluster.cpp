@@ -321,6 +321,9 @@ bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::sta
             if (flag2) {
                 sink_vertex->set_idx(_graph->get_ff_vertexes().size());
                 _graph->add_vertex(sink_vertex);
+
+                // add sequential element's direct predecessor
+                sink_seq->set_predecessor(src_seq);
             }
 
             if (flag1 || flag2) {
