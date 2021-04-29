@@ -1,6 +1,6 @@
 #include "sequentialGraph.h"
 
-sequentialArc::sequentialArc() : _src(nullptr), _sink(nullptr) {}
+sequentialArc::sequentialArc() : _idx(UINT_MAX), _src(nullptr), _sink(nullptr) {}
 
 sequentialArc::sequentialArc(sequentialVertex* src, sequentialVertex* sink) : sequentialArc() {
     _src = src;
@@ -15,7 +15,7 @@ sequentialArc::~sequentialArc() {
     }
 }
 
-sequentialVertex::sequentialVertex() : _node(nullptr), _is_start(0), _is_end(0), _is_const(0) {}
+sequentialVertex::sequentialVertex() : _idx(UINT_MAX), _node(nullptr), _is_start(0), _is_end(0), _is_const(0) {}
 
 sequentialVertex::sequentialVertex(sequentialElement* node) : sequentialVertex() { _node = node; }
 

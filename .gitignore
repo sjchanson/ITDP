@@ -4,3 +4,5 @@ build/
 *.timing
 *.tau2015
 .vscode/
+log/
+*.out

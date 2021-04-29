@@ -59,3 +59,13 @@ void Logger::printInt(std::string input, int num, int verbose) {
     VERBOSE_CHECK()
     cout << input << " = " << num << endl;
 }
+
+void Logger::printString(std::string input, std::string context, int verbose) {
+    VERBOSE_CHECK()
+    cout << input << " : " << context << endl;
+}
+
+void Logger::printItself(std::string context, int verbose) {
+    VERBOSE_CHECK()
+    cout << context << endl;
+}

@@ -4,11 +4,11 @@
 #include "utility.h"
 
 int main(int argc, char** argv) {
-    Logger* _log = new Logger("iTDP0.2", 0);
+    Logger* _log = new Logger("iTDP0.2", 1);
     double begin, end;
 
     // Print Title
-    _log->displayTitle(argc, argv);
+    _log->displayTitle(argc, argv, 1);
 
     // Read File Run Time Begin
     begin = microtime();
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
 
     // Read File Run Time End
     end = microtime();
-    _log->printTime("Read File", end - begin);
+    _log->printTime("Read File", end - begin, 1);
 
     // Evaluate Timing Run Time Begin
     begin = microtime();
@@ -33,16 +33,13 @@ int main(int argc, char** argv) {
 
     // Evaluate Timing Run Time End
     end = microtime();
-    _log->printTime("Evaluate Timing", end - begin);
+    _log->printTime("Evaluate Timing", end - begin, 1);
 
     // Cluster FlipFlop
     begin = microtime();
     clusterFF* _cluster_ff = new clusterFF(_circuit, _log);
     end = microtime();
-    _log->printTime("Init Flipflop topo", end - begin);
-
-    _log->printInt("NO TimingEnding Cell Count", NOTIMING_END_CELL);
-    _log->printInt("NO OUTPUT PIN FlIPFLOP", NOOUTPUT_FLIPFLIP);
+    _log->printTime("Init Flipflop topo", end - begin, 1);
 
     return 0;
 }

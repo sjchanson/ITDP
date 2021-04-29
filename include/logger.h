@@ -18,19 +18,22 @@ public:
     Logger(std::string name, int verbose);
 
     // Print functions
-    void displayTitle(int argc, char** argv, int verbose = 0);
+    void displayTitle(int argc, char** argv, int verbose);
 
-    void programBegin(std::string input, int verbose = 0);
-    void programEnd(std::string input, int verbose = 0);
+    void programBegin(std::string input, int verbose);
+    void programEnd(std::string input, int verbose);
 
-    void warn(std::string input, int code, int verbose = 0);
-    void error(std::string input, int code, int verbose = 0);
+    void warn(std::string input, int code, int verbose);
+    void error(std::string input, int code, int verbose);
 
-    void printTime(std::string input, double time, int verbose = 0);
+    void printTime(std::string input, double time, int verbose);
 
-    void printPair(std::string input, int x, int y, int verbose = 0);
+    void printPair(std::string input, int x, int y, int verbose);
 
-    void printInt(std::string input, int num, int verbose = 0);
+    void printInt(std::string input, int num, int verbose);
+    void printString(std::string input, std::string context, int verbose);
+
+    void printItself(std::string context, int verbose);
 
 private:
     int _verbose;

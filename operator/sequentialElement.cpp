@@ -9,7 +9,9 @@ bool coordinate::isLegalCoord() { return !(x == INT_MAX || y == INT_MAX); }
 
 sequentialElement::sequentialElement()
     : _is_pi(0)
+    , _is_ff_pi(0)
     , _is_po(0)
+    , _is_ff_po(0)
     , _is_ff(0)
     , _is_visited(0)
     , _name("")

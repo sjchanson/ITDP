@@ -39,6 +39,8 @@ public:
     cluster* get_clus() const { return _belonging_clus; }
 
     void set_name(string name) { _name = name; }
+    void set_ff_pi() { _is_ff_pi = 1; }
+    void set_ff_po() { _is_ff_po = 1; }
     void set_ff() { _is_ff = 1; }
     void set_visited() { _is_visited = 1; }
     void set_coord(coordinate coord) { _coord = coord; }
@@ -51,13 +53,17 @@ public:
     cell* get_cell() const { return _cell; }
 
     unsigned isPi() const { return _is_pi; }
+    unsigned isFFPi() const { return _is_ff_pi; }
+    unsigned isFFPo() const { return _is_ff_po; }
     unsigned isPo() const { return _is_po; }
     unsigned isFlipFlop() const { return _is_ff; }
     unsigned isVisited() const { return _is_visited; }
 
 private:
     unsigned _is_pi : 1;
+    unsigned _is_ff_pi : 1;
     unsigned _is_po : 1;
+    unsigned _is_ff_po : 1;
     unsigned _is_ff : 1;
     unsigned _is_visited : 1;
     string _name;

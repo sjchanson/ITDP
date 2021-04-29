@@ -22,9 +22,6 @@
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 
-int NOTIMING_END_CELL = 0;
-int NOOUTPUT_FLIPFLIP = 0;
-
 class clusterFF {
 public:
     clusterFF();
@@ -37,8 +34,8 @@ public:
     unsigned cellToPin(cell* cell);
 
     void ergodicGenerateGraph(std::stack<sequentialElement*>& stack);
-
-    sequentialVertex* makeVertex(sequentialElement* seq, int& flag);
+    sequentialVertex* makeVertex(sequentialElement* seq, bool& flag);
+    bool addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack);
 
 private:
     sequentialGraph* _graph;
@@ -48,11 +45,15 @@ private:
     vector<pin*> _pin_vec;
     vector<net*> _net_vec;
     Logger* _log;
-    vector<sequentialElement*> _flipflop_pvec;
 
-    std::unordered_map<cell*, unsigned> _cell2Visited;
+    vector<cell*> _flipflop_vec;
+    std::unordered_map<std::string, bool> _is_visited_ff;
+
+    std::unordered_map<std::string, unsigned> _cell2Visited;
 
     std::unordered_map<std::string, uint> _vertex2Id;
 
     void init();
+
+    void modifyVisitedFFMap(std::string key, bool value);
 };
