@@ -90,8 +90,8 @@ public:
     void add_end_vertex(sequentialVertex* end_vertex);
     void add_const_vertex(sequentialVertex* const_vertex);
 
-    std::vector<sequentialVertex*> get_ff_vertexes() const { return _vertexes; }
-    std::vector<sequentialArc*> get_ff_edges() const { return _arcs; }
+    std::vector<sequentialVertex*> get_vertexes() const { return _vertexes; }
+    std::vector<sequentialArc*> get_edges() const { return _arcs; }
     std::set<sequentialVertex*> get_start_vertexes() const { return _start_vertexes; }
     std::set<sequentialVertex*> get_end_vertexes() const { return _end_vertexes; }
     std::set<sequentialVertex*> get_const_vertexes() const { return _const_vertexes; }

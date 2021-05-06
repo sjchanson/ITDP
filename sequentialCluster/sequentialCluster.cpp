@@ -172,8 +172,7 @@ void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& sta
         }
 
         // special case in ICCAD2015 contest.
-        if (sink_pin->isFlopInput && !sink_pin->isFlopCkPort &&
-            stringToId(_cell_vec[sink_pin->owner]->ports, "q") == UINT_MAX) {
+        if (sink_pin->isFlopInput && stringToId(_cell_vec[sink_pin->owner]->ports, "q") == UINT_MAX) {
             cell* sink_cell = _cell_vec[sink_pin->owner];
 
             sequentialElement* sink_seq = new sequentialElement(sink_cell);
@@ -274,7 +273,7 @@ uint sequentialCluster::stringToId(map<string, unsigned> port_map, string port_n
 sequentialVertex* sequentialCluster::makeVertex(sequentialElement* seq, bool& flag) {
     auto v = _vertex2Id.find(seq->get_name());
     if (v == _vertex2Id.end()) {
-        _vertex2Id[seq->get_name()] = _graph->get_ff_vertexes().size();
+        _vertex2Id[seq->get_name()] = _graph->get_vertexes().size();
 
         // visited ff record.
         if (!seq->isPi() && !seq->isPo()) {
@@ -286,7 +285,7 @@ sequentialVertex* sequentialCluster::makeVertex(sequentialElement* seq, bool& fl
 
     } else {
         flag = false;
-        return _graph->get_ff_vertexes()[v->second];
+        return _graph->get_vertexes()[v->second];
     }
 }
 
@@ -313,21 +312,13 @@ bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::sta
         if (src_seq->isFlipFlop() || src_seq->isPi() || src_seq->isFFPi()) {
             sequentialVertex* src_vertex = makeVertex(src_seq, flag1);
             if (flag1) {
-                src_vertex->set_idx(_graph->get_ff_vertexes().size());
+                src_vertex->set_idx(_graph->get_vertexes().size());
                 _graph->add_vertex(src_vertex);
-            }
-
-            // add sequential element's direct predecessor
-            sink_seq->add_predecessor(src_seq);
-
-            if (sink_seq->get_predecessors().size() > 1) {
-                cout << "test" << endl;
-
             }
 
             sequentialVertex* sink_vertex = makeVertex(sink_seq, flag2);
             if (flag2) {
-                sink_vertex->set_idx(_graph->get_ff_vertexes().size());
+                sink_vertex->set_idx(_graph->get_vertexes().size());
                 _graph->add_vertex(sink_vertex);
             }
 
@@ -336,7 +327,7 @@ bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::sta
                 for (auto cell : edge_cells) {
                     edge->add_logic_cells(cell);
                 }
-                edge->set_idx(_graph->get_ff_edges().size());
+                edge->set_idx(_graph->get_edges().size());
                 _graph->add_edge(edge);
 
                 src_vertex->add_connect_vertexes(sink_vertex->get_idx());
@@ -357,7 +348,7 @@ bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::sta
                     for (auto cell : edge_cells) {
                         edge->add_logic_cells(cell);
                     }
-                    edge->set_idx(_graph->get_ff_edges().size());
+                    edge->set_idx(_graph->get_edges().size());
                     _graph->add_edge(edge);
 
                     src_vertex->add_connect_vertexes(sink_vertex->get_idx());
@@ -366,6 +357,8 @@ bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::sta
                     sink_vertex->add_src_edges(edge);
                 }
             }
+            // add sequential element's direct predecessor
+            sink_vertex->get_vertex()->add_predecessor(src_vertex->get_vertex());
             return true;
         }
         edge_cells.push_back(src_seq->get_cell());
@@ -385,11 +378,11 @@ void sequentialCluster::modifyVisitedFFMap(std::string key, bool value) {
 }
 
 void sequentialCluster::printGraphInfo() {
-    _log->printInt("Vertexes Count", _graph->get_ff_vertexes().size(), 1);
+    _log->printInt("Vertexes Count", _graph->get_vertexes().size(), 1);
 
     uint v_pi = 0, v_po = 0, v_ff_pi = 0, v_ff_po = 0, v_ff = 0;
 
-    for (auto vertex : _graph->get_ff_vertexes()) {
+    for (auto vertex : _graph->get_vertexes()) {
         if (vertex->get_vertex()->isFlipFlop()) {
             v_ff++;
         }
@@ -414,5 +407,5 @@ void sequentialCluster::printGraphInfo() {
     _log->printInt("Vertex:PI(FF)", v_ff_pi, 1);
     _log->printInt("Vertex:PO(FF)", v_ff_po, 1);
 
-    _log->printInt("Edges Count", _graph->get_ff_edges().size(), 1);
+    _log->printInt("Edges Count", _graph->get_edges().size(), 1);
 }
