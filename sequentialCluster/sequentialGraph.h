@@ -1,4 +1,5 @@
-/**
+ 
+ /**
  * @file sequentialGraph.h
  * @author SJchan (13560469332@163.com)
  * @brief
@@ -65,6 +66,9 @@ public:
 
     std::vector<sequentialArc*>& get_src_edges() { return _src_edges; }
     std::vector<sequentialArc*>& get_sink_edges() { return _sink_edges; }
+
+    unsigned isStart() const { return _is_start; }
+    unsigned isEnd() const { return _is_end; }
 
 private:
     uint _idx;

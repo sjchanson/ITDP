@@ -1,7 +1,7 @@
 #include "sequentialCluster.h"
 
+#include <iomanip>
 #include <iostream>
-#include <mutex>
 #include <sstream>
 
 sequentialCluster::sequentialCluster() : _log(nullptr), _graph(nullptr), _circuit(nullptr) {}
@@ -118,6 +118,10 @@ void sequentialCluster::init() {
         std::stack<sequentialElement*> seq_stack;  // stack for DFS.
         sequentialElement* ff = new sequentialElement(flipflop);
         ff->set_ff_pi();
+
+        // setting skew
+        ff->set_skew(0.0);
+
         seq_stack.push(ff);
         _cell2Visited.clear();  // avoid repeated visits to the logic cells.
 
@@ -155,6 +159,8 @@ void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& sta
         pinToSinkPins(cur_seq->get_pio_pin()->id, sinks);
     } else {
         cell* begin_cell = cur_seq->get_cell();
+        _cell2Visited[begin_cell->name] = 1;  // signed for avoiding ring in one traverse.
+
         vector<unsigned> outpins = cellToPins(begin_cell);
         if (outpins.empty()) {
             return;
@@ -178,6 +184,10 @@ void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& sta
             sequentialElement* sink_seq = new sequentialElement(sink_cell);
             // treat it as PO processing
             sink_seq->set_ff_po();
+
+            // setting skew
+            sink_seq->set_skew(-(sink_pin->lateSlk));
+
             addSequentialGraph(sink_seq, stack);
             return;
         }
@@ -194,6 +204,10 @@ void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& sta
 
         if (sink_pin->isFlopInput && !sink_pin->isFlopCkPort) {
             sink_seq->set_ff();
+
+            // setting skew
+            sink_seq->set_skew(-(sink_pin->lateSlk));
+
             stack.push(sink_seq);
         } else {
             stack.push(sink_seq);  // Logic cell
@@ -298,11 +312,14 @@ sequentialVertex* sequentialCluster::makeVertex(sequentialElement* seq, bool& fl
  * @return false
  */
 bool sequentialCluster::addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack) {
-    if (!sink_seq || stack.empty()) {
+    if (!sink_seq) {
         _log->error("ERROR in addGraph", 1, 1);
         return false;
     }
-
+    if (stack.empty()) {
+        _log->warn("Current Stack is empty", 1, 1);
+        return false;
+    }
     bool flag1 = true;
     bool flag2 = true;
     vector<cell*> edge_cells;
@@ -408,4 +425,94 @@ void sequentialCluster::printGraphInfo() {
     _log->printInt("Vertex:PO(FF)", v_ff_po, 1);
 
     _log->printInt("Edges Count", _graph->get_edges().size(), 1);
+}
+
+// void sequentialCluster::test() {
+//     auto graph = _graph;
+//     std::stack<sequentialVertex*> stack;
+
+//     for (auto& pi : graph->get_start_vertexes()) {
+//         stack.push(pi);
+//         testDFS(stack);
+//     }
+// }
+
+// void sequentialCluster::testDFS(std::stack<sequentialVertex*>& stack) {
+//     auto cur_v = stack.top();
+
+//     if (cur_v->get_vertex()->get_skew() == DBL_MAX) {
+//         _log->warn("Skew has not arranged", 1, 1);
+//     }
+
+//     if (cur_v->isEnd()) {
+//         stack.pop();
+//         return;
+//     }
+
+//     for (int i = 0; i < cur_v->get_sink_edges().size(); i++) {
+//         auto next_v = cur_v->get_sink_edges()[i]->get_sink();
+//         stack.push(next_v);
+//         testDFS(stack);
+//     }
+//     stack.pop();
+// }
+
+void sequentialCluster::plot() {
+    ofstream dot_seq("plot.gds");
+    if (!dot_seq.good()) {
+        _log->error("Cannot open file for writing", 1, 1);
+    }
+
+    stringstream feed;
+    feed.precision(0);
+
+    int dbu = 1;
+
+    // header
+    feed << "HEADER 5" << endl;
+    feed << "BGNLIB" << endl;
+    feed << "LIBNAME TDP_Lib" << endl;
+    feed << "UNITS 0.0005 1e-9" << endl;
+    feed << "BGNSTR" << endl;
+    feed << "STRNAME plot" << endl;
+    feed << std::fixed << endl;
+
+    // print the die area
+    feed << "BOUNDARY" << endl;
+    feed << "LAYER 0" << endl;
+    feed << "DATATYPE 0" << endl;
+    feed << "XY" << endl;
+    feed << _circuit->get_lx() * dbu << " : " << _circuit->get_by() * dbu << endl;
+    feed << _circuit->get_rx() * dbu << " : " << _circuit->get_by() * dbu << endl;
+    feed << _circuit->get_rx() * dbu << " : " << _circuit->get_ty() * dbu << endl;
+    feed << _circuit->get_lx() * dbu << " : " << _circuit->get_ty() * dbu << endl;
+    feed << _circuit->get_lx() * dbu << " : " << _circuit->get_by() * dbu << endl;
+    feed << "ENDEL" << endl;
+    feed << endl;
+
+    for (auto& vertex : _graph->get_vertexes()) {
+        cell* cur_cell = vertex->get_vertex()->get_cell();
+        if (cur_cell) {
+            feed << "BOUNDARY" << endl;
+            feed << "LAYER 1" << endl;
+            feed << "DATATYPE 0" << endl;
+            feed << "XY" << endl;
+
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+
+            feed << "ENDEL" << endl;
+            feed << endl;
+        }
+    }
+
+    feed << "ENDSTR" << endl;
+    feed << "ENDLIB" << endl;
+
+    dot_seq << feed.str();
+    feed.clear();
+    dot_seq.close();
 }

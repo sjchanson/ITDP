@@ -103,7 +103,9 @@ struct macro {
     double height; /* in microns */
     vector<unsigned> sites;
     map<string, macro_pin> pins;
-    vector<rect> obses; /* keyword OBS for non-rectangular shapes in micros */
+    vector<rect> obses; /* keyword OBS for non-rectangular shapes
+
+     in micros */
 
     macro() : name(""), type(""), isFlop(false), xOrig(0.0), yOrig(0.0), width(0.0), height(0.0) {}
     void print();
@@ -377,6 +379,12 @@ public:
     vector<unsigned> &pIs() { return PIs; }
     vector<unsigned> &pOs() { return POs; }
     uit::Timer &get_timer() { return timer; }
+
+    /* boundary getter */
+    double get_lx() { return lx; }
+    double get_by() { return by; }
+    double get_rx() { return rx; }
+    double get_ty() { return ty; }
 
     /* benchmark generation */
     string benchmark; /* benchmark name */

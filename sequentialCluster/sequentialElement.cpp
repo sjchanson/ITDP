@@ -30,12 +30,14 @@ sequentialElement::sequentialElement(pin* p_pin) : sequentialElement() {
     _pio_pin = p_pin;
     set_name(p_pin->name);
     set_coord(coordinate(p_pin->x_coord, p_pin->y_coord));
+    set_skew(-(p_pin->lateSlk));
 };
 
 sequentialElement::sequentialElement(cell* cell) : sequentialElement() {
     _cell = cell;
     set_name(cell->name);
     set_coord(coordinate(cell->x_coord, cell->y_coord));
+    
 }
 
 sequentialElement::~sequentialElement() { _belonging_clus = nullptr; }

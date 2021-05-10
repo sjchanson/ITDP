@@ -32,6 +32,11 @@ public:
     vector<unsigned> cellToPins(cell* cell);
     uint stringToId(map<string, unsigned> port_map, string port_name);
 
+    void test();
+    void testDFS(std::stack<sequentialVertex*>& stack);
+
+    void plot();
+
 private:
     Logger* _log;
     sequentialGraph* _graph;

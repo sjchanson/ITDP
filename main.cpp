@@ -41,7 +41,17 @@ int main(int argc, char** argv) {
     end = microtime();
     _log->printTime("Init Flipflop topo", end - begin, 1);
 
-    
+    // Check if the graph has a ring
+    // begin = microtime();
+    // _cluster_ff->test();
+    // end = microtime();
+    // _log->printTime("Test timing", end - begin, 1);
+
+    // Plot SequentialElement
+    begin = microtime();
+    _cluster_ff->plot();
+    end = microtime();
+    _log->printTime("Plot", end - begin, 1);
 
     return 0;
 }
