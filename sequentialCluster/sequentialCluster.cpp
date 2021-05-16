@@ -4,11 +4,22 @@
 #include <iostream>
 #include <sstream>
 
-sequentialCluster::sequentialCluster() : _log(nullptr), _graph(nullptr), _circuit(nullptr) {}
+sequentialCluster::sequentialCluster()
+    : _slack_flag(0.0)
+    , _log(nullptr)
+    , _graph(nullptr)
+    , _circuit(nullptr)
+    , _core_x(0.0)
+    , _core_y(0.0)
+    , _max_required_skew(0.0)
+    , _max_difference_skew(0.0) {}
 
 sequentialCluster::sequentialCluster(circuit* circuit, Logger* log) : sequentialCluster() {
     _circuit = circuit;
     _log = log;
+
+    _core_x = _circuit->get_rx() - _circuit->get_lx();
+    _core_y = _circuit->get_ty() - _circuit->get_by();
 
     // get cells pointer.
     for (auto& cell : _circuit->getCells()) {
@@ -128,6 +139,10 @@ void sequentialCluster::init() {
         ergodicGenerateGraph(seq_stack);  // from the FlipFlop, traverse all paths to POs.
     }
 
+    makeNormalization();
+    _graph->updateHop();
+
+
     printGraphInfo();
 }
 
@@ -186,7 +201,16 @@ void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& sta
             sink_seq->set_ff_po();
 
             // setting skew
-            sink_seq->set_skew(-(sink_pin->lateSlk));
+            if (sink_pin->lateSlk <= 0) {
+                double required_skew = abs(sink_pin->lateSlk) + sink_pin->earlySlk;
+                sink_seq->set_skew(required_skew);
+
+                _required_skews.push_back(required_skew);
+                _skews.push_back(sink_pin->lateSlk);
+
+            } else {
+                sink_seq->set_skew(_slack_flag);
+            }
 
             addSequentialGraph(sink_seq, stack);
             return;
@@ -206,7 +230,15 @@ void sequentialCluster::ergodicGenerateGraph(std::stack<sequentialElement*>& sta
             sink_seq->set_ff();
 
             // setting skew
-            sink_seq->set_skew(-(sink_pin->lateSlk));
+            if (sink_pin->lateSlk <= 0) {
+                double required_skew = abs(sink_pin->lateSlk) + sink_pin->earlySlk;
+                sink_seq->set_skew(required_skew);
+
+                _required_skews.push_back(required_skew);
+                _skews.push_back(sink_pin->lateSlk);
+            } else {
+                sink_seq->set_skew(_slack_flag);
+            }
 
             stack.push(sink_seq);
         } else {
@@ -458,7 +490,7 @@ void sequentialCluster::printGraphInfo() {
 // }
 
 void sequentialCluster::plot() {
-    ofstream dot_seq("plot.gds");
+    ofstream dot_seq(_circuit->get_design_name() + ".gds");
     if (!dot_seq.good()) {
         _log->error("Cannot open file for writing", 1, 1);
     }
@@ -466,9 +498,7 @@ void sequentialCluster::plot() {
     stringstream feed;
     feed.precision(0);
 
-    int dbu = 1;
-
-    // header
+    // Header
     feed << "HEADER 5" << endl;
     feed << "BGNLIB" << endl;
     feed << "LIBNAME TDP_Lib" << endl;
@@ -482,11 +512,11 @@ void sequentialCluster::plot() {
     feed << "LAYER 0" << endl;
     feed << "DATATYPE 0" << endl;
     feed << "XY" << endl;
-    feed << _circuit->get_lx() * dbu << " : " << _circuit->get_by() * dbu << endl;
-    feed << _circuit->get_rx() * dbu << " : " << _circuit->get_by() * dbu << endl;
-    feed << _circuit->get_rx() * dbu << " : " << _circuit->get_ty() * dbu << endl;
-    feed << _circuit->get_lx() * dbu << " : " << _circuit->get_ty() * dbu << endl;
-    feed << _circuit->get_lx() * dbu << " : " << _circuit->get_by() * dbu << endl;
+    feed << _circuit->get_lx() << " : " << _circuit->get_by() << endl;
+    feed << _circuit->get_rx() << " : " << _circuit->get_by() << endl;
+    feed << _circuit->get_rx() << " : " << _circuit->get_ty() << endl;
+    feed << _circuit->get_lx() << " : " << _circuit->get_ty() << endl;
+    feed << _circuit->get_lx() << " : " << _circuit->get_by() << endl;
     feed << "ENDEL" << endl;
     feed << endl;
 
@@ -515,4 +545,14 @@ void sequentialCluster::plot() {
     dot_seq << feed.str();
     feed.clear();
     dot_seq.close();
+}
+
+void sequentialCluster::makeNormalization() {
+    std::sort(_required_skews.begin(), _required_skews.end());
+    _max_required_skew = _required_skews.back();
+
+    std::sort(_skews.begin(), _skews.end());
+    double max_skew = _skews.back();
+    double min_skew = _skews.front();
+    _max_difference_skew = max_skew - min_skew;
 }

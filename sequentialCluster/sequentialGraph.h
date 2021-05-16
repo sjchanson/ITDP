@@ -1,5 +1,5 @@
- 
- /**
+
+/**
  * @file sequentialGraph.h
  * @author SJchan (13560469332@163.com)
  * @brief
@@ -12,10 +12,13 @@
 
 #pragma once
 
+#include <memory>
 #include <set>
+#include <stack>
 #include <vector>
 
 #include "../evaluate.h"
+#include "../include/utility.h"
 #include "sequentialElement.h"
 
 class sequentialElement;
@@ -59,6 +62,9 @@ public:
     void add_src_edges(sequentialArc* src_edge) { _src_edges.push_back(src_edge); }
     void add_sink_edges(sequentialArc* sink_edge) { _sink_edges.push_back(sink_edge); }
 
+    void add_from_vertexes(uint from) { _from_vertexes.insert(from); }
+    void add_to_vertexes(uint to) { _to_vertexes.insert(to); }
+
     void set_idx(uint id) { _idx = id; }
     void set_start() { _is_start = 1; }
     void set_end() { _is_end = 1; }
@@ -66,6 +72,11 @@ public:
 
     std::vector<sequentialArc*>& get_src_edges() { return _src_edges; }
     std::vector<sequentialArc*>& get_sink_edges() { return _sink_edges; }
+
+    std::unordered_set<uint>& get_from_vertexes() { return _from_vertexes; }
+    std::unordered_set<uint>& get_to_vertexes() { return _to_vertexes; }
+
+    std::unordered_set<uint>& get_connect_vertexes() { return _to_vertexes; }
 
     unsigned isStart() const { return _is_start; }
     unsigned isEnd() const { return _is_end; }
@@ -80,6 +91,9 @@ private:
     std::vector<sequentialArc*> _sink_edges;  // The sequentialArc sinked to the vertex.
 
     std::vector<uint> _connect_vertexes;  // In order to judge the vertex direct connection
+
+    std::unordered_set<uint> _from_vertexes;  // Record the from vertexes.
+    std::unordered_set<uint> _to_vertexes;    // Record the to vertexes.
 };
 
 class sequentialGraph {
@@ -94,6 +108,17 @@ public:
     void add_end_vertex(sequentialVertex* end_vertex);
     void add_const_vertex(sequentialVertex* const_vertex);
 
+    void updateHop();
+    void hopForwardDFS(std::stack<sequentialVertex*>& stack);
+    void hopBackwardDFS(std::stack<sequentialVertex*>& stack);
+
+    bool findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2);
+
+    void updateCoordMapping();
+
+    sequentialVertex* findLeastCommonAncestor(sequentialVertex* vertex_1, sequentialVertex* vertex_2);
+    uint leastCommonAncestorDFS(std::stack<sequentialVertex*>& stack, std::unordered_set<uint>& search_set);
+
     std::vector<sequentialVertex*> get_vertexes() const { return _vertexes; }
     std::vector<sequentialArc*> get_edges() const { return _arcs; }
     std::set<sequentialVertex*> get_start_vertexes() const { return _start_vertexes; }
@@ -107,4 +132,10 @@ private:
     std::set<sequentialVertex*> _start_vertexes;
     std::set<sequentialVertex*> _end_vertexes;
     std::set<sequentialVertex*> _const_vertexes;
+
+    // for coordinate mapping
+    std::vector<int> _x_coords;
+    std::vector<int> _y_coords;
+    std::unordered_multimap<int, sequentialVertex*> _x_to_vertexs;
+    std::unordered_multimap<int, sequentialVertex*> _y_to_vertexs;
 };

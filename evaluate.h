@@ -376,6 +376,8 @@ public:
     vector<net> &getNets() { return nets; }
     vector<pin> &getPins() { return pins; }
     vector<row> &getRows() { return rows; }
+
+    
     vector<unsigned> &pIs() { return PIs; }
     vector<unsigned> &pOs() { return POs; }
     uit::Timer &get_timer() { return timer; }
@@ -385,6 +387,9 @@ public:
     double get_by() { return by; }
     double get_rx() { return rx; }
     double get_ty() { return ty; }
+
+    /* design name getter */
+    std::string get_design_name() const { return design_name; }
 
     /* benchmark generation */
     string benchmark; /* benchmark name */
