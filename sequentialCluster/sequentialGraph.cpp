@@ -7,6 +7,13 @@ sequentialArc::sequentialArc(sequentialVertex* src, sequentialVertex* sink) : se
     _sink = sink;
 }
 
+// sequentialArc::sequentialArc(const sequentialArc& obj) {
+//     _idx = obj._idx;
+//     _logic_cells = obj._logic_cells;
+//     _src = new sequentialVertex(*obj._src);
+//     _sink = new sequentialVertex(*obj._sink);
+// }
+
 sequentialArc::~sequentialArc() {
     _src = nullptr;
     _sink = nullptr;
@@ -18,6 +25,26 @@ sequentialArc::~sequentialArc() {
 sequentialVertex::sequentialVertex() : _idx(UINT_MAX), _node(nullptr), _is_start(0), _is_end(0), _is_const(0) {}
 
 sequentialVertex::sequentialVertex(sequentialElement* node) : sequentialVertex() { _node = node; }
+
+// sequentialVertex::sequentialVertex(const sequentialVertex& obj) {
+//     _idx = obj._idx;
+//     _node = obj._node;
+//     _is_start = obj._is_start;
+//     _is_end = obj._is_end;
+//     _is_const = obj._is_const;
+//     _connect_vertexes = obj._connect_vertexes;
+//     _from_vertexes = obj._from_vertexes;
+//     _to_vertexes = obj._to_vertexes;
+
+//     for (auto src_edge : obj._src_edges) {
+//         sequentialArc* edge = new sequentialArc(*src_edge);
+//         _src_edges.push_back(edge);
+//     }
+//     for (auto sink_edge : obj._sink_edges) {
+//         sequentialArc* edge = new sequentialArc(*sink_edge);
+//         _sink_edges.push_back(edge);
+//     }
+// }
 
 sequentialVertex::~sequentialVertex() {
     _node = nullptr;
@@ -33,6 +60,17 @@ sequentialVertex::~sequentialVertex() {
 }
 
 sequentialGraph::sequentialGraph() = default;
+
+// sequentialGraph::sequentialGraph(const sequentialGraph& obj) {
+//     _x_coords = obj._x_coords;
+//     _y_coords = obj._y_coords;
+//     _x_to_vertexs = obj._x_to_vertexs;
+//     _y_to_vertexs = obj._y_to_vertexs;
+
+//     for(auto v : obj._vertexes) {
+
+//     }
+// }
 
 sequentialGraph::~sequentialGraph() {
     for (int i = 0; i < _vertexes.size(); i++) {
@@ -72,6 +110,7 @@ void sequentialGraph::updateHop() {
     for (auto& pi : _start_vertexes) {
         if (!vertex_stack.empty()) {
             std::cout << "ERROR in Stack" << std::endl;
+            
             exit(1);
         }
         vertex_stack.push(pi);
@@ -149,18 +188,28 @@ void sequentialGraph::hopBackwardDFS(std::stack<sequentialVertex*>& stack) {
     stack.pop();
 }
 
-bool sequentialGraph::findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2) {
+void sequentialGraph::initDegree() {
+    for (auto vertex : _vertexes) {
+        _vertex_to_degree[vertex->get_idx()] = vertex->get_src_edges().size();
+    }
+}
+
+bool sequentialGraph::findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
+                               std::unordered_map<uint, int> vertex_to_degree) {
+    // trick for quick search ring.
     if (vertex_1->get_connect_vertexes().find(vertex_2->get_idx()) != vertex_1->get_connect_vertexes().end()) {
         return false;
     }
-
     if (vertex_1->get_to_vertexes().find(vertex_2->get_idx()) != vertex_1->get_to_vertexes().end()) {
         return true;
     }
-
     if (vertex_1->get_from_vertexes().find(vertex_2->get_idx()) != vertex_1->get_from_vertexes().end()) {
         return true;
     }
+
+    // topological sorting to find ring.
+    
+
 
     return false;
 }
@@ -213,12 +262,9 @@ void sequentialGraph::updateCoordMapping() {
 
         _x_coords.push_back(x_coord);
         _y_coords.push_back(y_coord);
-        _x_to_vertexs.emplace(x_coord, vertex);
-        _y_to_vertexs.emplace(y_coord, vertex);
+        _x_to_vertexs.emplace(x_coord, vertex->get_idx());
+        _y_to_vertexs.emplace(y_coord, vertex->get_idx());
     }
     std::sort(_x_coords.begin(), _y_coords.end());
     std::sort(_y_coords.begin(), _y_coords.end());
 }
-
-
-

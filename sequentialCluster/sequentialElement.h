@@ -26,6 +26,7 @@ struct coordinate {
     bool isLegalCoord();
 };
 
+
 class sequentialElement {
 public:
     sequentialElement();

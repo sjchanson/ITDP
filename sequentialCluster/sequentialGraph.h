@@ -17,7 +17,7 @@
 #include <stack>
 #include <vector>
 
-#include "../evaluate.h"
+// #include "../evaluate.h"
 #include "../include/utility.h"
 #include "sequentialElement.h"
 
@@ -29,6 +29,10 @@ class sequentialArc {
 public:
     sequentialArc();
     sequentialArc(sequentialVertex* src, sequentialVertex* sink);
+
+    // copy constructor
+    sequentialArc(const sequentialArc& obj);
+
     ~sequentialArc();
 
     void set_idx(uint id) { _idx = id; }
@@ -50,6 +54,10 @@ class sequentialVertex {
 public:
     sequentialVertex();
     sequentialVertex(sequentialElement* node);
+
+    // copy constructor
+    sequentialVertex(const sequentialVertex& obj);
+
     ~sequentialVertex();
 
     uint get_idx() const { return _idx; }
@@ -99,6 +107,10 @@ private:
 class sequentialGraph {
 public:
     sequentialGraph();
+
+    // copy constructor
+    sequentialGraph(const sequentialGraph& obj);
+
     ~sequentialGraph();
 
     void add_vertex(sequentialVertex* v);
@@ -112,7 +124,10 @@ public:
     void hopForwardDFS(std::stack<sequentialVertex*>& stack);
     void hopBackwardDFS(std::stack<sequentialVertex*>& stack);
 
-    bool findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2);
+    void initDegree();
+
+    bool findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
+                  std::unordered_map<uint, int> vertex_to_degree);
 
     void updateCoordMapping();
 
@@ -136,6 +151,9 @@ private:
     // for coordinate mapping
     std::vector<int> _x_coords;
     std::vector<int> _y_coords;
-    std::unordered_multimap<int, sequentialVertex*> _x_to_vertexs;
-    std::unordered_multimap<int, sequentialVertex*> _y_to_vertexs;
+    std::unordered_multimap<int, uint> _x_to_vertexs;
+    std::unordered_multimap<int, uint> _y_to_vertexs;
+
+    // for topological sorting
+    std::unordered_map<uint, int> _vertex_to_degree;
 };
