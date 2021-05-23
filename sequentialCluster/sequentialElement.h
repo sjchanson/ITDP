@@ -19,6 +19,8 @@
 
 class cluster;
 
+class sequentialCluster;
+
 struct coordinate {
     int x;
     int y;
@@ -26,6 +28,86 @@ struct coordinate {
     bool isLegalCoord();
 };
 
+class sequentialBase {
+public:
+    sequentialBase();
+    virtual ~sequentialBase() = default;
+
+    uint get_id() const { return _id; }
+    string get_name() const { return _name; }
+    double get_skew() const { return _skew; }
+    coordinate get_coord() const { return _coord; }
+
+    void set_id(uint idx) { _id = idx; }
+    void set_coord(coordinate coord) { _coord = coord; }
+    void set_skew(double skew) { _skew = skew; }
+
+    virtual void update() = 0;
+
+protected:
+    uint _type;  // 0->PI/PO,1->FlipFlop,2->Cluster.
+    uint _id;
+    string _name;
+    double _skew;
+    coordinate _coord;
+};
+
+class sequentialPrimaryIO : public sequentialBase {
+public:
+    sequentialPrimaryIO() = default;
+    sequentialPrimaryIO(pin* pin);
+    ~sequentialPrimaryIO();
+
+    unsigned isPi() const { return _is_pi; }
+    unsigned isPo() const { return _is_po; }
+
+    void update();
+
+private:
+    unsigned _is_pi : 1;
+    unsigned _is_po : 1;
+    pin* _pin;
+};
+
+class sequentialFlipFlop : public sequentialBase {
+public:
+    sequentialFlipFlop() = default;
+    sequentialFlipFlop(cell* cell, pin* input_pin, uint skew_flag);
+    ~sequentialFlipFlop();
+
+    void update();
+
+    unsigned isFFPi() const { return _is_ff_pi; }
+    unsigned isFFPo() const { return _is_ff_po; }
+    sequentialCluster* get_cluster() const { return _belong_cluster; }
+
+    void set_ff_pi() { _is_ff_pi = 1; }
+    void set_ff_po() { _is_ff_po = 1; }
+    void set_cluster(sequentialCluster* clus) { _belong_cluster = clus; }
+
+private:
+    unsigned _is_ff_pi : 1;
+    unsigned _is_ff_po : 1;
+    uint _skew_flag;
+    pin* _input_pin;
+    cell* _flipflop;
+    sequentialCluster* _belong_cluster;
+};
+
+class sequentialCluster : public sequentialBase {
+public:
+    sequentialCluster() = default;
+    sequentialCluster(std::string name);
+    ~sequentialCluster() = default;
+
+    void update();
+
+    void add_flipflop(sequentialFlipFlop* ff) { _subordinate_flipflops.insert(ff); }
+    std::unordered_set<sequentialFlipFlop*> get_subordinate_flipflops() const { return _subordinate_flipflops; }
+
+private:
+    std::unordered_set<sequentialFlipFlop*> _subordinate_flipflops;
+};
 
 class sequentialElement {
 public:
