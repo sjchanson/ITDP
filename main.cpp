@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
 
     // Cluster FlipFlop
     begin = microtime();
-    sequentialCluster* _cluster_ff = new sequentialCluster(_circuit, _log);
+    sequentialOpt* _cluster_ff = new sequentialOpt(_circuit, _log);
     end = microtime();
     _log->printTime("Init Flipflop topo", end - begin, 1);
 

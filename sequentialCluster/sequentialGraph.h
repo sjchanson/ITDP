@@ -18,6 +18,7 @@
 #include <vector>
 
 // #include "../evaluate.h"
+#include "../include/logger.h"
 #include "../include/utility.h"
 #include "sequentialElement.h"
 
@@ -53,7 +54,7 @@ private:
 class sequentialVertex {
 public:
     sequentialVertex();
-    sequentialVertex(sequentialElement* node);
+    sequentialVertex(sequentialBase* node);
 
     // copy constructor
     sequentialVertex(const sequentialVertex& obj);
@@ -63,7 +64,7 @@ public:
     uint get_idx() const { return _idx; }
     std::vector<uint> get_connect_vertexes() const { return _connect_vertexes; }
 
-    sequentialElement* get_vertex() const { return _node; }
+    sequentialBase* get_vertex() const { return _node; }
 
     void add_connect_vertexes(uint id) { _connect_vertexes.push_back(id); }
 
@@ -78,22 +79,22 @@ public:
     void set_end() { _is_end = 1; }
     void set_const() { _is_const = 1; }
 
+    bool operator==(const sequentialVertex*& v);
+
     std::vector<sequentialArc*>& get_src_edges() { return _src_edges; }
     std::vector<sequentialArc*>& get_sink_edges() { return _sink_edges; }
 
     std::unordered_set<uint>& get_from_vertexes() { return _from_vertexes; }
     std::unordered_set<uint>& get_to_vertexes() { return _to_vertexes; }
 
-    std::unordered_set<uint>& get_connect_vertexes() { return _to_vertexes; }
-
     unsigned isStart() const { return _is_start; }
     unsigned isEnd() const { return _is_end; }
 
 private:
     uint _idx;
-    sequentialElement* _node;
-    unsigned _is_start : 1;                   // The vertex is start sequentialElement.
-    unsigned _is_end : 1;                     // The vertex is end sequentialElement.
+    sequentialBase* _node;
+    unsigned _is_start : 1;                   // The vertex is start sequentialBase.
+    unsigned _is_end : 1;                     // The vertex is end sequentialBase.
     unsigned _is_const : 1;                   // The vertex is const.
     std::vector<sequentialArc*> _src_edges;   // The sequentialArc sourced from the vertex.
     std::vector<sequentialArc*> _sink_edges;  // The sequentialArc sinked to the vertex.
@@ -104,9 +105,44 @@ private:
     std::unordered_set<uint> _to_vertexes;    // Record the to vertexes.
 };
 
+class sequentialPair {
+public:
+    sequentialPair();
+    sequentialPair(sequentialVertex* v1, sequentialVertex* v2);
+    ~sequentialPair() = default;
+
+    void set_distance(double value) { _distance = value; }
+
+    double get_distance() const { return _distance; }
+
+    bool operator==(sequentialPair* p);  // Overloading equality operators
+
+    bool findAnotherVetex(sequentialVertex* vetex_1, sequentialVertex*& another_vertex);
+
+private:
+    sequentialVertex* _vertex_1;
+    sequentialVertex* _vertex_2;
+    double _distance;
+};
+
+struct sequentialpairCmp {
+    bool operator()(const sequentialPair*& p1, const sequentialPair*& p2) const {
+        if (p1 == p2) {
+            return false;
+        }
+        return true;
+    }
+};
+
+struct vertexPtrHash {
+    size_t operator()(const sequentialVertex*& v_ptr) const {
+        return std::hash<string>()(v_ptr->get_vertex()->get_name());
+    }
+};
+
 class sequentialGraph {
 public:
-    sequentialGraph();
+    sequentialGraph(Logger* log, int side_length);
 
     // copy constructor
     sequentialGraph(const sequentialGraph& obj);
@@ -125,9 +161,21 @@ public:
     void hopBackwardDFS(std::stack<sequentialVertex*>& stack);
 
     void initDegree();
+    bool reduceDegree(sequentialVertex* v, std::unordered_map<std::string, int>& vertex_to_degree);
+
+    void initSeqentialPair();
+
+    std::set<sequentialVertex*> getRegionVertexes(int lx, int ly, int ux, int uy);
+    std::set<sequentialVertex*> getXCoordVertexes(int x);
+
+    double getDirectConnectingSkew(sequentialVertex* v1, sequentialVertex* v2);
+
+    void updatePairSkew(sequentialVertex* root);
+
+    sequentialVertex* findAncestor(sequentialVertex* vertex);
 
     bool findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
-                  std::unordered_map<uint, int> vertex_to_degree);
+                  std::unordered_map<std::string, int> vertex_to_degree);
 
     void updateCoordMapping();
 
@@ -141,6 +189,8 @@ public:
     std::set<sequentialVertex*> get_const_vertexes() const { return _const_vertexes; }
 
 private:
+    Logger* _log;
+    int _side_length;
     std::vector<sequentialVertex*> _vertexes;
     std::vector<sequentialArc*> _arcs;
 
@@ -154,6 +204,14 @@ private:
     std::unordered_multimap<int, uint> _x_to_vertexs;
     std::unordered_multimap<int, uint> _y_to_vertexs;
 
+    // for sequential pair
+    std::set<sequentialPair*, sequentialpairCmp> _sequential_pairs;
+
     // for topological sorting
-    std::unordered_map<uint, int> _vertex_to_degree;
+    std::unordered_map<std::string, int> _vertex_to_degree;
+
+    // for finding lowest common ancestor
+    std::unordered_map<sequentialVertex*, sequentialVertex*, vertexPtrHash> _vertex_to_ancestor;
+    std::unordered_map<sequentialVertex*, bool, vertexPtrHash> _visited;
+    std::vector<sequentialVertex*> _record_path;
 };

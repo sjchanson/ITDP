@@ -33,6 +33,7 @@ public:
     sequentialBase();
     virtual ~sequentialBase() = default;
 
+    uint get_type() const { return _type; }
     uint get_id() const { return _id; }
     string get_name() const { return _name; }
     double get_skew() const { return _skew; }
@@ -45,7 +46,7 @@ public:
     virtual void update() = 0;
 
 protected:
-    uint _type;  // 0->PI/PO,1->FlipFlop,2->Cluster.
+    uint _type;  // 0->PI , 1->PO , 2->LogicCell 3->FlipFlop , 4->Cluster
     uint _id;
     string _name;
     double _skew;
@@ -54,7 +55,7 @@ protected:
 
 class sequentialPrimaryIO : public sequentialBase {
 public:
-    sequentialPrimaryIO() = default;
+    sequentialPrimaryIO();
     sequentialPrimaryIO(pin* pin);
     ~sequentialPrimaryIO();
 
@@ -63,16 +64,34 @@ public:
 
     void update();
 
+    pin* get_pin() const { return _pin; }
+
 private:
     unsigned _is_pi : 1;
     unsigned _is_po : 1;
     pin* _pin;
 };
 
+class sequentialLogicCell : public sequentialBase {
+public:
+    sequentialLogicCell();
+    sequentialLogicCell(cell* cell);
+    ~sequentialLogicCell();
+
+    void update() {}
+
+    cell* get_logic_cell() const { return _cell; }
+
+private:
+    cell* _cell;
+};
+
 class sequentialFlipFlop : public sequentialBase {
 public:
-    sequentialFlipFlop() = default;
+    sequentialFlipFlop();
+    sequentialFlipFlop(cell* cell);  // for special case in ICCAD 2015 Contest.
     sequentialFlipFlop(cell* cell, pin* input_pin, uint skew_flag);
+
     ~sequentialFlipFlop();
 
     void update();
@@ -80,6 +99,7 @@ public:
     unsigned isFFPi() const { return _is_ff_pi; }
     unsigned isFFPo() const { return _is_ff_po; }
     sequentialCluster* get_cluster() const { return _belong_cluster; }
+    cell* get_flipflop() const { return _flipflop; }
 
     void set_ff_pi() { _is_ff_pi = 1; }
     void set_ff_po() { _is_ff_po = 1; }
@@ -102,7 +122,7 @@ public:
 
     void update();
 
-    void add_flipflop(sequentialFlipFlop* ff) { _subordinate_flipflops.insert(ff); }
+    void add_flipflop(sequentialFlipFlop* ff);
     std::unordered_set<sequentialFlipFlop*> get_subordinate_flipflops() const { return _subordinate_flipflops; }
 
 private:

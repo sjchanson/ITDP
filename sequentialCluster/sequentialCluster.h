@@ -23,17 +23,23 @@
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 
-class sequentialCluster {
+class sequentialOpt {
 public:
-    sequentialCluster();
-    sequentialCluster(circuit* circuit, Logger* log);
-    ~sequentialCluster();
+    sequentialOpt();
+    sequentialOpt(circuit* circuit, Logger* log);
+    ~sequentialOpt();
 
     void set_slack_flag(double flag) { _slack_flag = flag; }
 
     void pinToSinkPins(unsigned pin_idx, vector<pin*>& pins);
     vector<unsigned> cellToPins(cell* cell);
     uint stringToId(map<string, unsigned> port_map, string port_name);
+
+    // modify.
+    sequentialPrimaryIO* idToSeqIO(uint idx) { return _seq_io_vec[idx]; }
+    sequentialLogicCell* idToSeqCell(uint idx) { return _seq_cell_vec[idx]; }
+    sequentialFlipFlop* idToSeqFF(uint idx) { return _seq_ff_vec[idx]; }
+    sequentialCluster* idToSeqClus(uint idx) { return _seq_cluster_vec[idx]; }
 
     void test();
     void testDFS(std::stack<sequentialVertex*>& stack);
@@ -50,6 +56,12 @@ private:
     vector<pin*> _pin_vec;
     vector<net*> _net_vec;
     vector<cell*> _flipflop_vec;
+
+    // modify.
+    vector<sequentialPrimaryIO*> _seq_io_vec;
+    vector<sequentialLogicCell*> _seq_cell_vec;
+    vector<sequentialFlipFlop*> _seq_ff_vec;
+    vector<sequentialCluster*> _seq_cluster_vec;
 
     std::unordered_map<std::string, bool> _is_visited_ff;
     std::unordered_map<std::string, unsigned> _cell2Visited;
@@ -69,9 +81,9 @@ private:
 
     void modifyVisitedFFMap(std::string key, bool value);
 
-    sequentialVertex* makeVertex(sequentialElement* seq, bool& flag);
-    bool addSequentialGraph(sequentialElement* sink_seq, std::stack<sequentialElement*> stack);
-    void ergodicGenerateGraph(std::stack<sequentialElement*>& stack);
+    sequentialVertex* makeVertex(sequentialBase* seq, bool& flag);
+    bool addSequentialGraph(sequentialBase* sink_seq, std::stack<sequentialBase*> stack);
+    void ergodicGenerateGraph(std::stack<sequentialBase*>& stack);
     void printGraphInfo();
 
     void makeNormalization();

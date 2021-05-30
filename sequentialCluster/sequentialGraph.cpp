@@ -24,7 +24,7 @@ sequentialArc::~sequentialArc() {
 
 sequentialVertex::sequentialVertex() : _idx(UINT_MAX), _node(nullptr), _is_start(0), _is_end(0), _is_const(0) {}
 
-sequentialVertex::sequentialVertex(sequentialElement* node) : sequentialVertex() { _node = node; }
+sequentialVertex::sequentialVertex(sequentialBase* node) : sequentialVertex() { _node = node; }
 
 // sequentialVertex::sequentialVertex(const sequentialVertex& obj) {
 //     _idx = obj._idx;
@@ -59,7 +59,63 @@ sequentialVertex::~sequentialVertex() {
     }
 }
 
-sequentialGraph::sequentialGraph() = default;
+bool sequentialVertex::operator==(const sequentialVertex*& v) {
+    if (this->get_vertex()->get_name() == v->get_vertex()->get_name()) {
+        return true;
+    }
+    return false;
+}
+
+sequentialPair::sequentialPair() : _vertex_1(nullptr), _vertex_2(nullptr), _distance(DBL_MAX) {}
+
+sequentialPair::sequentialPair(sequentialVertex* v1, sequentialVertex* v2) : sequentialPair() {
+    _vertex_1 = v1;
+    _vertex_2 = v2;
+}
+
+bool sequentialPair::operator==(sequentialPair* p) {
+    std::string v1_name = this->_vertex_1->get_vertex()->get_name();
+    std::string v2_name = this->_vertex_2->get_vertex()->get_name();
+    std::string p1_name = p->_vertex_1->get_vertex()->get_name();
+    std::string p2_name = p->_vertex_2->get_vertex()->get_name();
+
+    if (v1_name == p2_name && v2_name == p1_name) {
+        return true;
+    }
+
+    if (v1_name == p1_name && v2_name == p2_name) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief find whether is the looking for vertex in pair, if true, return the other vertex.
+ *
+ * @param vertex_1
+ * @param another_vertex
+ * @return true
+ * @return false
+ */
+bool sequentialPair::findAnotherVetex(sequentialVertex* vertex_1, sequentialVertex*& another_vertex) {
+    if (vertex_1 == _vertex_1) {
+        another_vertex = _vertex_2;
+        return true;
+    }
+
+    if (vertex_1 == _vertex_2) {
+        another_vertex = _vertex_1;
+        return true;
+    }
+
+    another_vertex = nullptr;
+    return false;
+}
+
+sequentialGraph::sequentialGraph(Logger* log, int side_length) {
+    _log = log;
+    _side_length = side_length;
+}
 
 // sequentialGraph::sequentialGraph(const sequentialGraph& obj) {
 //     _x_coords = obj._x_coords;
@@ -82,16 +138,7 @@ sequentialGraph::~sequentialGraph() {
 }
 
 void sequentialGraph::add_vertex(sequentialVertex* v) {
-    if (v->get_vertex()->isPi() || v->get_vertex()->isFFPi()) {
-        v->set_start();
-        add_start_vertex(v);
-    } else if (v->get_vertex()->isPo() || v->get_vertex()->isFFPo()) {
-        v->set_end();
-        add_end_vertex(v);
-    } else {
-        v->set_const();
-        add_const_vertex(v);
-    }
+    // should distinguish different type of vertexes, start/end/const
     _vertexes.push_back(v);
 }
 
@@ -110,7 +157,7 @@ void sequentialGraph::updateHop() {
     for (auto& pi : _start_vertexes) {
         if (!vertex_stack.empty()) {
             std::cout << "ERROR in Stack" << std::endl;
-            
+
             exit(1);
         }
         vertex_stack.push(pi);
@@ -190,16 +237,187 @@ void sequentialGraph::hopBackwardDFS(std::stack<sequentialVertex*>& stack) {
 
 void sequentialGraph::initDegree() {
     for (auto vertex : _vertexes) {
-        _vertex_to_degree[vertex->get_idx()] = vertex->get_src_edges().size();
+        _vertex_to_degree[vertex->get_vertex()->get_name()] = vertex->get_src_edges().size();
     }
 }
 
-bool sequentialGraph::findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
-                               std::unordered_map<uint, int> vertex_to_degree) {
-    // trick for quick search ring.
-    if (vertex_1->get_connect_vertexes().find(vertex_2->get_idx()) != vertex_1->get_connect_vertexes().end()) {
-        return false;
+bool sequentialGraph::reduceDegree(sequentialVertex* v, std::unordered_map<std::string, int>& vertex_to_degree) {
+    auto iter = vertex_to_degree.find(v->get_vertex()->get_name());
+    if (iter == vertex_to_degree.end()) {
+        _log->error("Error occur in reduce degree", 1, 1);
+    } else {
+        iter->second = iter->second - 1;
+        if (iter->second == 0) {
+            return true;
+        }
     }
+    return false;
+}
+
+/**
+ * @brief init the searching pair, and arrange this distance.
+ *
+ */
+void sequentialGraph::initSeqentialPair() {
+    for (auto vertex : _vertexes) {
+        auto vertex_base = vertex->get_vertex();
+        if (vertex_base->get_type() == 3) {
+            int low_x = vertex_base->get_coord().x - _side_length / 2;
+            int low_y = vertex_base->get_coord().y - _side_length / 2;
+            int top_x = vertex_base->get_coord().x + _side_length / 2;
+            int top_y = vertex_base->get_coord().y + _side_length / 2;
+
+            std::set<sequentialVertex*> region_vertexes;
+            region_vertexes = this->getRegionVertexes(low_x, low_y, top_x, top_y);
+
+            for (auto region_vertex : region_vertexes) {
+                if (vertex == region_vertex) {
+                    continue;
+                }
+
+                // ring case
+                if (this->findRing(vertex, region_vertex, _vertex_to_degree)) {
+                    continue;
+                }
+
+                sequentialPair* pair = new sequentialPair(vertex, region_vertex);
+                _sequential_pairs.insert(pair);
+
+                // direct connecting case
+                for (auto v : region_vertex->get_connect_vertexes()) {
+                    if (v == vertex->get_idx()) {
+                        // shoule make normalization.
+                        pair->set_distance(this->getDirectConnectingSkew(vertex, region_vertex));
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief giving an region , return vertexes inside the region.
+ *
+ * @param lx
+ * @param ly
+ * @param ux
+ * @param uy
+ * @return std::set<sequentialVertex*>
+ */
+std::set<sequentialVertex*> sequentialGraph::getRegionVertexes(int lx, int ly, int ux, int uy) {
+    std::set<sequentialVertex*> region_vertexes;
+
+    int low_subscript = 0;
+    int high_subscript = 0;
+    for (int i = 0; i < _x_coords.size(); i++) {
+        if (_x_coords[i] <= lx) {
+            low_subscript = i;
+        } else if (_x_coords[i] > lx && _x_coords[i] <= uy) {
+            high_subscript = i;
+        } else {
+            break;
+        }
+    }
+
+    for (int i = low_subscript; i < high_subscript + 1; i++) {
+        // find vertex* with giving x coord.
+        std::set<sequentialVertex*> x_vertexes;
+        x_vertexes = this->getXCoordVertexes(_x_coords[i]);
+        for (auto vertex : x_vertexes) {
+            int vertex_y = vertex->get_vertex()->get_coord().y;
+            if (vertex_y >= ly && vertex_y <= uy) {
+                region_vertexes.insert(vertex);
+            }
+        }
+    }
+    return region_vertexes;
+}
+
+/**
+ * @brief giving a coord , return the vertex vector. If not found, return the empty vertexes.
+ *
+ * @param x
+ * @return std::vector<sequentialVertex*>
+ */
+std::set<sequentialVertex*> sequentialGraph::getXCoordVertexes(int x) {
+    std::set<sequentialVertex*> x_vertexes;
+    auto key_num = _x_to_vertexs.count(x);
+    if (key_num == 1) {
+        uint vertex_id = _x_to_vertexs.find(x)->second;
+        x_vertexes.insert(_vertexes[vertex_id]);
+    } else if (key_num > 1) {
+        auto range = _x_to_vertexs.equal_range(key_num);
+        while (range.first != range.second) {
+            uint vertex_id = range.first->second;
+            x_vertexes.insert(_vertexes[vertex_id]);
+            ++range.first;
+        }
+    }
+    return x_vertexes;
+}
+
+double sequentialGraph::getDirectConnectingSkew(sequentialVertex* v1, sequentialVertex* v2) {
+    for (auto edge : v2->get_src_edges()) {
+        if (edge->get_src() == v1) {
+            return v2->get_vertex()->get_skew();
+        }
+    }
+    return v1->get_vertex()->get_skew();
+}
+
+void sequentialGraph::updatePairSkew(sequentialVertex* root) {
+    _record_path.push_back(root);
+
+    // Termination conditions
+    if (root->get_sink_edges().empty()) {
+        return;
+    }
+
+    for (auto edge : root->get_sink_edges()) {
+        auto cur_vertex = edge->get_sink();
+        updatePairSkew(cur_vertex);
+
+        for (auto pair : _sequential_pairs) {
+            sequentialVertex* another_vertex;
+            sequentialVertex* ancestor;
+            if (pair->findAnotherVetex(cur_vertex, another_vertex) && _visited[another_vertex]) {
+                ancestor = findAncestor(another_vertex);
+            }
+        }
+
+        _visited[cur_vertex] = true;
+        _vertex_to_ancestor[cur_vertex] = root;
+
+        // record the second path.
+        
+
+        _record_path.pop_back();
+    }
+    _visited[root] = true;
+}
+
+sequentialVertex* sequentialGraph::findAncestor(sequentialVertex* vertex) {
+    sequentialVertex* cur_v = vertex;
+
+    while (!(cur_v == _vertex_to_ancestor[cur_v])) {
+        // can record the path.
+
+        cur_v = _vertex_to_ancestor[cur_v];
+    }
+
+    return cur_v;
+}
+
+bool sequentialGraph::findRing(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
+                               std::unordered_map<std::string, int> vertex_to_degree) {
+    // trick for quick search ring.
+    for (auto v : vertex_1->get_connect_vertexes()) {
+        if (v == vertex_2->get_idx()) {
+            return false;
+        }
+    }
+
     if (vertex_1->get_to_vertexes().find(vertex_2->get_idx()) != vertex_1->get_to_vertexes().end()) {
         return true;
     }
@@ -208,8 +426,27 @@ bool sequentialGraph::findRing(sequentialVertex* vertex_1, sequentialVertex* ver
     }
 
     // topological sorting to find ring.
-    
+    std::queue<sequentialVertex*> cur_queue;
+    for (auto pi : _start_vertexes) {
+        cur_queue.push(pi);
+    }
 
+    while (!cur_queue.empty()) {
+        sequentialVertex* cur_vertex = cur_queue.front();
+        for (auto edge : cur_vertex->get_sink_edges()) {
+            sequentialVertex* sink_vertex = edge->get_sink();
+            if (reduceDegree(sink_vertex, _vertex_to_degree)) {
+                cur_queue.push(sink_vertex);
+            }
+        }
+        cur_queue.pop();
+    }
+
+    for (auto vertex : _end_vertexes) {
+        if (vertex_to_degree[vertex->get_vertex()->get_name()] != 0) {
+            return true;
+        }
+    }
 
     return false;
 }
