@@ -1,20 +1,25 @@
-#include "sequentialCluster.h"
+#include "sequentialOperator.h"
 
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 
-sequentialOpt::sequentialOpt()
-    : _slack_flag(0.0)
+arrivalDistance::arrivalDistance(sequentialBase* base, double dist) {
+    arrival_base = base;
+    distance = dist;
+}
+
+sequentialOperator::sequentialOperator()
+    : _para(nullptr)
     , _log(nullptr)
     , _graph(nullptr)
     , _circuit(nullptr)
     , _core_x(0.0)
     , _core_y(0.0)
-    , _max_required_skew(0.0)
-    , _max_difference_skew(0.0) {}
+    , _max_required_skew(0.0) {}
 
-sequentialOpt::sequentialOpt(circuit* circuit, Logger* log) : sequentialOpt() {
+sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger* log) : sequentialOperator() {
+    _para = para;
     _circuit = circuit;
     _log = log;
 
@@ -42,7 +47,7 @@ sequentialOpt::sequentialOpt(circuit* circuit, Logger* log) : sequentialOpt() {
     for (auto cur_pin : _pin_vec) {
         if (cur_pin->isFlopInput && !cur_pin->isFlopCkPort) {
             auto& cell = _cell_vec[cur_pin->owner];
-            _is_visited_ff[cell->name] = false;
+            _is_visited_ff[cell->name] = false;  // init the flipflop visit.
             _flipflop_vec.push_back(cell);
         }
     }
@@ -50,7 +55,7 @@ sequentialOpt::sequentialOpt(circuit* circuit, Logger* log) : sequentialOpt() {
     init();
 }
 
-sequentialOpt::~sequentialOpt() {
+sequentialOperator::~sequentialOperator() {
     _log = nullptr;
     _graph = nullptr;
     _circuit = nullptr;
@@ -76,8 +81,8 @@ sequentialOpt::~sequentialOpt() {
     }
 }
 
-void sequentialOpt::init() {
-    _graph = new sequentialGraph(_log, 100);
+void sequentialOperator::init() {
+    _graph = new sequentialGraph(_log);
 
     vector<pin*> pi_vec;
     vector<pin*> po_vec;
@@ -114,15 +119,14 @@ void sequentialOpt::init() {
     for (auto cur_pin : pi_vec) {
         std::stack<sequentialBase*> seq_stack;  // stack for DFS.
 
-        // modify.
         sequentialPrimaryIO* pi = new sequentialPrimaryIO(cur_pin);
-        pi->set_id(_seq_io_vec.size());
+        pi->set_id(_seq_io_vec.size());  // set id.
         _seq_io_vec.push_back(pi);
 
         seq_stack.push(pi);
         _cell2Visited.clear();  // avoid repeated visits to the logic cells.
 
-        ergodicGenerateGraph(seq_stack);  // from the PI, traverse all paths to POs.
+        ergodicGenerateGraph(seq_stack);  // from the PI, traverse all paths to POs / FlipFlops.
     }
 
     // special case in ICCAD2015 benchmark
@@ -133,7 +137,6 @@ void sequentialOpt::init() {
         }
         std::stack<sequentialBase*> seq_stack;  // stack for DFS.
 
-        // modify.
         sequentialFlipFlop* ff = new sequentialFlipFlop(flipflop);
 
         ff->set_ff_pi();
@@ -148,7 +151,7 @@ void sequentialOpt::init() {
     }
 
     makeNormalization();
-    _graph->updateHop();
+    _graph->initHop();
 
     printGraphInfo();
 }
@@ -159,7 +162,7 @@ void sequentialOpt::init() {
  *
  * @param stack
  */
-void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
+void sequentialOperator::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
     if (stack.empty()) {
         _log->error("NO SEQUENTIALELEMENT HERE.", 1, 1);
         return;
@@ -171,7 +174,8 @@ void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
     sequentialBase* cur_seq = stack.top();
 
     // the sequential element has already be a vetex in graph.
-    if (_vertex2Id.find(cur_seq->get_name()) != _vertex2Id.end()) {
+    auto graph_vertexes = _graph->get_vertexes();
+    if (graph_vertexes.find(cur_seq->get_name()) != graph_vertexes.end()) {
         stack.pop();  // must pop current FlipFlop element.
         addSequentialGraph(cur_seq, stack);
         return;
@@ -179,7 +183,7 @@ void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
 
     if (cur_seq->get_type() == 0) {  // PI case
         auto seq_io = idToSeqIO(cur_seq->get_id());
-        pinToSinkPins(seq_io->get_pin()->id, sinks);
+        pinIdToSinkPins(seq_io->get_pin()->id, sinks);
     } else {  // FlipFlop/LogicCell case
         cell* begin_cell;
         if (cur_seq->get_type() == 2) {
@@ -194,12 +198,12 @@ void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
 
         _cell2Visited[begin_cell->name] = 1;  // signed for avoiding ring in one traverse.
 
-        vector<unsigned> outpins = cellToPins(begin_cell);
+        vector<unsigned> outpins = cellToPinIds(begin_cell);
         if (outpins.empty()) {
             return;
         }
         for (auto outpin_idx : outpins) {
-            pinToSinkPins(outpin_idx, sinks);
+            pinIdToSinkPins(outpin_idx, sinks);
         }
     }
 
@@ -217,18 +221,20 @@ void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
         if (sink_pin->isFlopInput && stringToId(_cell_vec[sink_pin->owner]->ports, "q") == UINT_MAX) {
             cell* sink_cell = _cell_vec[sink_pin->owner];
 
-            sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _slack_flag);
+            sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _para);
             // treat it as PO processing
             sink_seq->set_ff_po();
             sink_seq->set_id(_seq_ff_vec.size());
-            _seq_ff_vec.push_back(sink_seq);
-
             // setting skew
             if (sink_pin->lateSlk <= 0) {
                 double required_skew = abs(sink_pin->lateSlk) + sink_pin->earlySlk;
+                sink_seq->set_skew(required_skew);
+
                 _required_skews.push_back(required_skew);
-                _skews.push_back(sink_pin->lateSlk);
+            } else {
+                sink_seq->set_skew(_para->skew_flag);
             }
+            _seq_ff_vec.push_back(sink_seq);
 
             addSequentialGraph(sink_seq, stack);
             return;
@@ -240,19 +246,23 @@ void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
         if (_cell2Visited.find(sink_cell->name) != _cell2Visited.end()) {
             continue;
         }
-        _cell2Visited[sink_cell->name] = 1;  // signed for avoiding ring in one traverse.
+        // _cell2Visited[sink_cell->name] = 1;  // signed for avoiding ring in one traverse.
 
         if (sink_pin->isFlopInput) {
-            sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _slack_flag);
+            sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _para);
             sink_seq->set_id(_seq_ff_vec.size());
-            _seq_ff_vec.push_back(sink_seq);
 
             // record skew
             if (sink_pin->lateSlk <= 0) {
                 double required_skew = abs(sink_pin->lateSlk) + sink_pin->earlySlk;
+                sink_seq->set_skew(required_skew);
+
                 _required_skews.push_back(required_skew);
-                _skews.push_back(sink_pin->lateSlk);
+            } else {
+                sink_seq->set_skew(_para->skew_flag);
             }
+
+            _seq_ff_vec.push_back(sink_seq);
 
             stack.push(sink_seq);
         } else {
@@ -282,7 +292,7 @@ void sequentialOpt::ergodicGenerateGraph(std::stack<sequentialBase*>& stack) {
  * @param pin_idx
  * @param pins
  */
-void sequentialOpt::pinToSinkPins(unsigned pin_idx, vector<pin*>& pins) {
+void sequentialOperator::pinIdToSinkPins(unsigned pin_idx, vector<pin*>& pins) {
     net* cur_net = _net_vec[_pin_vec[pin_idx]->net];
     if (cur_net->source != pin_idx) {
         _log->error("Pass The ERROR Pin", 1, 1);
@@ -299,7 +309,7 @@ void sequentialOpt::pinToSinkPins(unsigned pin_idx, vector<pin*>& pins) {
  * @param cell
  * @return vector<unsigned>
  */
-vector<unsigned> sequentialOpt::cellToPins(cell* cell) {
+vector<unsigned> sequentialOperator::cellToPinIds(cell* cell) {
     vector<unsigned> outpins;
     std::map<string, unsigned>::iterator iter;
     for (iter = cell->ports.begin(); iter != cell->ports.end(); iter++) {
@@ -319,7 +329,7 @@ vector<unsigned> sequentialOpt::cellToPins(cell* cell) {
  * @param port_name
  * @return uint
  */
-uint sequentialOpt::stringToId(map<string, unsigned> port_map, string port_name) {
+uint sequentialOperator::stringToId(map<string, unsigned> port_map, string port_name) {
     auto cur_object = port_map.find(port_name);
     if (cur_object == port_map.end()) {
         return UINT_MAX;
@@ -334,22 +344,23 @@ uint sequentialOpt::stringToId(map<string, unsigned> port_map, string port_name)
  * @param flag
  * @return sequentialVertex*
  */
-sequentialVertex* sequentialOpt::makeVertex(sequentialBase* seq, bool& flag) {
-    auto v = _vertex2Id.find(seq->get_name());
-    if (v == _vertex2Id.end()) {
-        _vertex2Id[seq->get_name()] = _graph->get_vertexes().size();
-
+sequentialVertex* sequentialOperator::makeVertex(sequentialBase* seq, bool& flag) {
+    auto graph_vertexes = _graph->get_vertexes();  // searching the graph.
+    auto v = graph_vertexes.find(seq->get_name());
+    if (v == graph_vertexes.end()) {
+        flag = true;
         // visited ff record.
         if (seq->get_type() == 3) {
             modifyVisitedFFMap(seq->get_name(), true);
         }
 
-        flag = true;
-        return new sequentialVertex(seq);
+        sequentialVertex* vertex = new sequentialVertex(seq);
+        _graph->add_vertex(seq->get_name(), vertex);
 
+        return vertex;
     } else {
         flag = false;
-        return _graph->get_vertexes()[v->second];
+        return v->second;
     }
 }
 
@@ -361,7 +372,7 @@ sequentialVertex* sequentialOpt::makeVertex(sequentialBase* seq, bool& flag) {
  * @return true
  * @return false
  */
-bool sequentialOpt::addSequentialGraph(sequentialBase* sink_seq, std::stack<sequentialBase*> stack) {
+bool sequentialOperator::addSequentialGraph(sequentialBase* sink_seq, std::stack<sequentialBase*> stack) {
     if (!sink_seq) {
         _log->error("ERROR in addGraph", 1, 1);
         return false;
@@ -379,16 +390,17 @@ bool sequentialOpt::addSequentialGraph(sequentialBase* sink_seq, std::stack<sequ
         if (src_seq->get_type() == 0 || src_seq->get_type() == 3) {  // PI Flipflop case.
             sequentialVertex* src_vertex = makeVertex(src_seq, flag1);
             if (flag1) {
-                src_vertex->set_idx(_graph->get_vertexes().size());
-                _graph->add_vertex(src_vertex);
-                // modify.
+                // Supplementary vertex information
                 if (src_seq->get_type() == 0) {
+                    src_vertex->set_start();
                     _graph->add_start_vertex(src_vertex);
                 } else {
                     auto src_seq_obj = idToSeqFF(src_seq->get_id());
                     if (src_seq_obj->isFFPi()) {
+                        src_vertex->set_start();
                         _graph->add_start_vertex(src_vertex);
                     } else {
+                        src_vertex->set_const();
                         _graph->add_const_vertex(src_vertex);
                     }
                 }
@@ -396,16 +408,17 @@ bool sequentialOpt::addSequentialGraph(sequentialBase* sink_seq, std::stack<sequ
 
             sequentialVertex* sink_vertex = makeVertex(sink_seq, flag2);
             if (flag2) {
-                sink_vertex->set_idx(_graph->get_vertexes().size());
-                _graph->add_vertex(sink_vertex);
-                // modify.
+                // Supplementary vertex information
                 if (sink_seq->get_type() == 1) {
+                    sink_vertex->set_end();
                     _graph->add_end_vertex(sink_vertex);
                 } else {
                     auto sink_seq_obj = idToSeqFF(sink_seq->get_id());
                     if (sink_seq_obj->isFFPo()) {
+                        sink_vertex->set_end();
                         _graph->add_end_vertex(sink_vertex);
                     } else {
+                        sink_vertex->set_const();
                         _graph->add_const_vertex(sink_vertex);
                     }
                 }
@@ -416,37 +429,28 @@ bool sequentialOpt::addSequentialGraph(sequentialBase* sink_seq, std::stack<sequ
                 for (auto cell : edge_cells) {
                     edge->add_logic_cells(cell);
                 }
-                edge->set_idx(_graph->get_edges().size());
                 _graph->add_edge(edge);
 
-                src_vertex->add_connect_vertexes(sink_vertex->get_idx());
+                // Supplementary vertex information
                 src_vertex->add_sink_edges(edge);
-                sink_vertex->add_connect_vertexes(src_vertex->get_idx());
                 sink_vertex->add_src_edges(edge);
 
             } else {  // Check whether there are edges between two existing vertices
                 bool is_exist = 0;
-                for (auto idx : src_vertex->get_connect_vertexes()) {
-                    if (idx == sink_vertex->get_idx()) {
-                        is_exist = 1;
-                        break;
-                    }
+                if (_graph->isDirectHop(src_vertex, sink_vertex)) {
+                    is_exist = 1;
                 }
                 if (!is_exist) {
                     sequentialArc* edge = new sequentialArc(src_vertex, sink_vertex);
                     for (auto cell : edge_cells) {
                         edge->add_logic_cells(cell);
                     }
-                    edge->set_idx(_graph->get_edges().size());
                     _graph->add_edge(edge);
 
-                    src_vertex->add_connect_vertexes(sink_vertex->get_idx());
                     src_vertex->add_sink_edges(edge);
-                    sink_vertex->add_connect_vertexes(src_vertex->get_idx());
                     sink_vertex->add_src_edges(edge);
                 }
             }
-            // add sequential element's direct predecessor
             return true;
         }
         auto seq_obj = idToSeqCell(src_seq->get_id());
@@ -457,7 +461,7 @@ bool sequentialOpt::addSequentialGraph(sequentialBase* sink_seq, std::stack<sequ
     return false;
 }
 
-void sequentialOpt::modifyVisitedFFMap(std::string key, bool value) {
+void sequentialOperator::modifyVisitedFFMap(std::string key, bool value) {
     auto iter = _is_visited_ff.find(key);
     if (iter == _is_visited_ff.end()) {
         _log->error("Error occur in ff map", 1, 0);
@@ -466,15 +470,108 @@ void sequentialOpt::modifyVisitedFFMap(std::string key, bool value) {
     }
 }
 
-void sequentialOpt::printGraphInfo() {
+/**
+ * @brief init the pair.
+ *
+ */
+void sequentialOperator::initSequentialPair() {
+    _graph->initSeqentialPair(_para->side_length, _core_x, _core_y, _max_required_skew);
+}
+
+/**
+ * @brief major function. do vertex fusion.
+ *
+ */
+void sequentialOperator::updateVertexFusion() {
+    sequentialCluster* new_node = nullptr;
+
+    // sort the pairs.
+    _pairs = _graph->get_sequential_pairs();
+
+    // get the first pair
+    std::set<sequentialPair*, sequentialPairCmp>::iterator sort_iter = _pairs.begin();
+    sequentialVertex* v1 = (*sort_iter)->get_vertex1();
+    sequentialVertex* v2 = (*sort_iter)->get_vertex2();
+    double distance = (*sort_iter)->get_distance();
+
+    // identify the ring.
+    if (_graph->findRing(v1, v2)) {
+        // update the arrival metrix.
+    } else {
+        // update the sequential base.
+        sequentialBase* base_1 = v1->get_base();
+        sequentialBase* base_2 = v2->get_base();
+
+        // make sure here is filpflop or cluster.
+        if (base_1->get_type() == 3 && base_2->get_type() == 3) {
+            new_node = new sequentialCluster("cluster_" + base_1->get_name());
+            new_node->set_id(_seq_cluster_vec.size());
+
+            sequentialFlipFlop* element_1 = _seq_ff_vec[base_1->get_id()];
+            sequentialFlipFlop* element_2 = _seq_ff_vec[base_2->get_id()];
+
+            // add element to cluster.
+            new_node->add_flipflop(element_1);
+            new_node->add_flipflop(element_2);
+
+            // the element add cluster.
+            element_1->set_cluster(new_node);
+            element_2->set_cluster(new_node);
+
+            _seq_cluster_vec.push_back(new_node);
+
+        } else if (base_1->get_type() == 3 && base_2->get_type() == 4) {
+            new_node = _seq_cluster_vec[base_2->get_id()];
+            sequentialFlipFlop* flipflop = _seq_ff_vec[base_1->get_id()];
+
+            // add element to cluster.
+            new_node->add_flipflop(flipflop);
+            // the element add cluster.
+            flipflop->set_cluster(new_node);
+        } else if (base_1->get_type() == 4 && base_2->get_type() == 3) {
+            new_node = _seq_cluster_vec[base_1->get_id()];
+            sequentialFlipFlop* flipflop = _seq_ff_vec[base_2->get_id()];
+
+            // add element to cluster.
+            new_node->add_flipflop(flipflop);
+            // the element add cluster.
+            flipflop->set_cluster(new_node);
+        } else if (base_1->get_type() == 4 && base_2->get_type() == 4) {
+            new_node = _seq_cluster_vec[base_1->get_id()];
+            sequentialCluster* cluster = _seq_cluster_vec[base_2->get_id()];
+
+            // add all another cluster's element to cur cluster,and delete front cluster.
+            std::unordered_set<sequentialFlipFlop*>::iterator iter;
+            for (iter = cluster->get_subordinate_flipflops().begin();
+                 iter != cluster->get_subordinate_flipflops().end(); iter++) {
+                new_node->add_flipflop(*iter);
+            }
+            delete cluster;
+            _seq_cluster_vec[base_2->get_id()] = nullptr;  // set nullptr
+        } else {
+            _log->error("ERROR in update seqential element.", 1, 1);
+        }
+
+        // make vertex fusion.
+        _graph->makeVertexFusion(v1, v2, new sequentialVertex(new_node));
+    }
+}
+
+/**
+ * @brief print the information on screen.
+ *
+ */
+void sequentialOperator::printGraphInfo() {
     _log->printInt("Vertexes Count", _graph->get_vertexes().size(), 1);
 
     uint v_pi = 0, v_po = 0, v_ff_pi = 0, v_ff_po = 0, v_ff = 0;
 
-    for (auto vertex : _graph->get_vertexes()) {
-        if (vertex->get_vertex()->get_type() == 3) {
+    std::unordered_map<std::string, sequentialVertex*>::iterator iter;
+
+    for (iter = _graph->get_vertexes().begin(); iter != _graph->get_vertexes().end(); iter++) {
+        if ((*iter).second->get_base()->get_type() == 3) {
             v_ff++;
-            auto seq_obj = idToSeqFF(vertex->get_vertex()->get_id());
+            auto seq_obj = idToSeqFF((*iter).second->get_base()->get_id());
             if (seq_obj->isFFPi()) {
                 v_ff_pi++;
             }
@@ -482,14 +579,15 @@ void sequentialOpt::printGraphInfo() {
                 v_ff_po++;
             }
         }
-        if (vertex->get_vertex()->get_type() == 0) {
+        if ((*iter).second->get_base()->get_type() == 0) {
             v_pi++;
         }
 
-        if (vertex->get_vertex()->get_type() == 1) {
+        if ((*iter).second->get_base()->get_type() == 1) {
             v_po++;
         }
     }
+
     _log->printInt("Vertex:FlipFlop", v_ff, 1);
     _log->printInt("Vertex:PI", v_pi, 1);
     _log->printInt("Vertex:PO", v_po, 1);
@@ -512,7 +610,7 @@ void sequentialOpt::printGraphInfo() {
 // void sequentialCluster::testDFS(std::stack<sequentialVertex*>& stack) {
 //     auto cur_v = stack.top();
 
-//     if (cur_v->get_vertex()->get_skew() == DBL_MAX) {
+//     if (cur_v->get_base()->get_skew() == DBL_MAX) {
 //         _log->warn("Skew has not arranged", 1, 1);
 //     }
 
@@ -529,7 +627,7 @@ void sequentialOpt::printGraphInfo() {
 //     stack.pop();
 // }
 
-void sequentialOpt::plot() {
+void sequentialOperator::plot() {
     ofstream dot_seq(_circuit->get_design_name() + ".gds");
     if (!dot_seq.good()) {
         _log->error("Cannot open file for writing", 1, 1);
@@ -561,7 +659,7 @@ void sequentialOpt::plot() {
     feed << endl;
 
     for (auto& vertex : _graph->get_vertexes()) {
-        auto seq_obj = idToSeqFF(vertex->get_vertex()->get_id());
+        auto seq_obj = idToSeqFF(vertex.second->get_base()->get_id());  // can do that?
         cell* cur_cell = seq_obj->get_flipflop();
         if (cur_cell) {
             feed << "BOUNDARY" << endl;
@@ -588,12 +686,7 @@ void sequentialOpt::plot() {
     dot_seq.close();
 }
 
-void sequentialOpt::makeNormalization() {
+void sequentialOperator::makeNormalization() {
     std::sort(_required_skews.begin(), _required_skews.end());
     _max_required_skew = _required_skews.back();
-
-    std::sort(_skews.begin(), _skews.end());
-    double max_skew = _skews.back();
-    double min_skew = _skews.front();
-    _max_difference_skew = max_skew - min_skew;
 }

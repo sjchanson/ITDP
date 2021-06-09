@@ -1,5 +1,5 @@
 /**
- * @file cluster.h
+ * @file sequentialOperator.h
  * @author SJchan (13560469332@163.com)
  * @brief
  * @version 0.1
@@ -19,20 +19,29 @@
 
 #include "../evaluate.h"
 #include "../include/logger.h"
+#include "../include/parameter.h"
 #include "../include/utility.h"
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 
-class sequentialOpt {
+struct arrivalDistance {
+    sequentialBase* arrival_base;
+    double distance;
+    arrivalDistance(sequentialBase* base, double dist);
+};
+
+struct arrivalHash {
+    size_t operator()(const sequentialBase*& base_ptr) const { return std::hash<string>()(base_ptr->get_name()); }
+};
+
+class sequentialOperator {
 public:
-    sequentialOpt();
-    sequentialOpt(circuit* circuit, Logger* log);
-    ~sequentialOpt();
+    sequentialOperator();
+    sequentialOperator(parameter* para, circuit* circuit, Logger* log);
+    ~sequentialOperator();
 
-    void set_slack_flag(double flag) { _slack_flag = flag; }
-
-    void pinToSinkPins(unsigned pin_idx, vector<pin*>& pins);
-    vector<unsigned> cellToPins(cell* cell);
+    void pinIdToSinkPins(unsigned pin_idx, vector<pin*>& pins);
+    vector<unsigned> cellToPinIds(cell* cell);
     uint stringToId(map<string, unsigned> port_map, string port_name);
 
     // modify.
@@ -41,13 +50,17 @@ public:
     sequentialFlipFlop* idToSeqFF(uint idx) { return _seq_ff_vec[idx]; }
     sequentialCluster* idToSeqClus(uint idx) { return _seq_cluster_vec[idx]; }
 
+    void initSequentialPair();
+
+    void updateVertexFusion();
+
     void test();
     void testDFS(std::stack<sequentialVertex*>& stack);
 
     void plot();
 
 private:
-    double _slack_flag;
+    parameter* _para;
     Logger* _log;
     sequentialGraph* _graph;
     circuit* _circuit;
@@ -65,17 +78,16 @@ private:
 
     std::unordered_map<std::string, bool> _is_visited_ff;
     std::unordered_map<std::string, unsigned> _cell2Visited;
-    std::unordered_map<std::string, uint> _vertex2Id;
 
-    // for normalization
+    // normalization
     double _core_x;
     double _core_y;
 
     vector<double> _required_skews;
-    vector<double> _skews;
-
     double _max_required_skew;
-    double _max_difference_skew;
+
+    // pair store
+    std::set<sequentialPair*, sequentialPairCmp> _pairs;
 
     void init();
 

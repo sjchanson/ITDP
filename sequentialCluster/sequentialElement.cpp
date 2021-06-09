@@ -45,7 +45,7 @@ sequentialFlipFlop::sequentialFlipFlop()
     : sequentialBase()
     , _is_ff_pi(0)
     , _is_ff_po(0)
-    , _skew_flag(0)
+    , _para(nullptr)
     , _input_pin(nullptr)
     , _flipflop(nullptr)
     , _belong_cluster(nullptr) {}
@@ -57,21 +57,18 @@ sequentialFlipFlop::sequentialFlipFlop(cell* cell) : sequentialFlipFlop() {
     _flipflop = cell;
 }
 
-sequentialFlipFlop::sequentialFlipFlop(cell* cell, pin* input_pin, uint skew_flag) : sequentialFlipFlop() {
+sequentialFlipFlop::sequentialFlipFlop(cell* cell, pin* input_pin, parameter* para) : sequentialFlipFlop() {
     _type = 3;
     _name = cell->name;
-    _skew_flag = skew_flag;
-    if (input_pin->lateSlk <= 0) {
-        _skew = abs(input_pin->lateSlk) + input_pin->earlySlk;
-    } else {
-        _skew = _skew_flag;
-    }
+    _para = para;
+
     set_coord(coordinate(cell->x_coord, cell->y_coord));
     _input_pin = input_pin;
     _flipflop = cell;
 }
 
 sequentialFlipFlop::~sequentialFlipFlop() {
+    _para = nullptr;
     _input_pin = nullptr;
     _flipflop = nullptr;
     _belong_cluster = nullptr;
@@ -81,7 +78,7 @@ void sequentialFlipFlop::update() {
     if (_input_pin->lateSlk <= 0) {
         _skew = abs(_input_pin->lateSlk) + _input_pin->earlySlk;
     } else {
-        _skew = _skew_flag;
+        _skew = _para->skew_flag;
     }
     set_coord(coordinate(_flipflop->x_coord, _flipflop->y_coord));
 }
@@ -113,36 +110,3 @@ void sequentialCluster::update() {
     }
     set_coord(coordinate(x / _subordinate_flipflops.size(), y / _subordinate_flipflops.size()));
 }
-
-sequentialElement::sequentialElement()
-    : _is_pi(0)
-    , _is_ff_pi(0)
-    , _is_po(0)
-    , _is_ff_po(0)
-    , _is_ff(0)
-    , _name("")
-    , _skew(DBL_MAX)
-    , _coord(INT_MAX, INT_MAX)
-    , _pio_pin(nullptr)
-    , _cell(nullptr)
-    , _belonging_clus(nullptr) {}
-
-sequentialElement::sequentialElement(pin* p_pin) : sequentialElement() {
-    if (p_pin->type == 1) {
-        _is_pi = 1;
-    } else {
-        _is_po = 1;
-    }
-    _skew = 0.0;
-    _pio_pin = p_pin;
-    set_name(p_pin->name);
-    set_coord(coordinate(p_pin->x_coord, p_pin->y_coord));
-};
-
-sequentialElement::sequentialElement(cell* cell) : sequentialElement() {
-    _cell = cell;
-    set_name(cell->name);
-    set_coord(coordinate(cell->x_coord, cell->y_coord));
-}
-
-sequentialElement::~sequentialElement() { _belonging_clus = nullptr; }

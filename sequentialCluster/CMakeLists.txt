@@ -1,4 +1,4 @@
 add_library(sequentalCluster SHARED
-            sequentialCluster.cpp
+            sequentialOperator.cpp
             sequentialGraph.cpp
             sequentialElement.cpp)   
