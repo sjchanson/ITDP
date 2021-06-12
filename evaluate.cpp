@@ -60,8 +60,6 @@ bool circuit::measure_timing() {
         timer.set_at(driverName + ":a", EARLY, FALL, 0.);
         timer.set_at(driverName + ":a", LATE, RISE, 0.);
         timer.set_at(driverName + ":a", LATE, FALL, 0.);
-
-        
     }
 
     // 3. read out results

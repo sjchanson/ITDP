@@ -1,7 +1,7 @@
 #include "evaluate.h"
-#include "logger.h"
-#include "sequentialCluster/sequentialCluster.h"
-#include "utility.h"
+#include "include/logger.h"
+#include "include/utility.h"
+#include "sequentialCluster/sequentialOperator.h"
 
 int main(int argc, char** argv) {
     Logger* _log = new Logger("iTDP0.2", 1);
@@ -35,9 +35,12 @@ int main(int argc, char** argv) {
     end = microtime();
     _log->printTime("Evaluate Timing", end - begin, 1);
 
+    // parameter control
+    parameter* para = new parameter();
+
     // Cluster FlipFlop
     begin = microtime();
-    sequentialOperator* _cluster_ff = new sequentialOperator(_circuit, _log);
+    sequentialOperator* _cluster_ff = new sequentialOperator(para, _circuit, _log);
     end = microtime();
     _log->printTime("Init Flipflop topo", end - begin, 1);
 
@@ -52,6 +55,9 @@ int main(int argc, char** argv) {
     _cluster_ff->plot();
     end = microtime();
     _log->printTime("Plot", end - begin, 1);
+
+    // init the sequential pair.
+    _cluster_ff->initSequentialPair();
 
     return 0;
 }

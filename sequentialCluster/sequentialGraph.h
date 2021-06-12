@@ -63,9 +63,7 @@ public:
     ~sequentialVertex();
 
     struct vertexCmp {
-        bool operator()(sequentialVertex* left, sequentialVertex* right) const {
-            return left->get_name() < right->get_name();
-        }
+        bool operator()(sequentialVertex* left, sequentialVertex* right) const { return *left < *right; }
     };
 
     void add_src_edges(sequentialArc* src_edge) { _src_edges.push_back(src_edge); }
@@ -160,10 +158,14 @@ struct sequentialPairCmp {
             return *left < *right;
         }
     }
-} sequential_pair_cmp;
+};
 
 struct vertexPtrHash {
     size_t operator()(const sequentialVertex* v_ptr) const { return std::hash<string>()(v_ptr->get_name()); }
+};
+
+struct vertexPtrEqual {
+    bool operator()(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) const { return (*v_ptr1) < (*v_ptr2); }
 };
 
 class sequentialGraph {
@@ -247,15 +249,15 @@ private:
 
     // for sequential pair
     std::set<sequentialPair*, sequentialPairCmp> _sequential_pairs;
-    std::map<sequentialVertex*, std::map<sequentialVertex*, double, vertexPtrHash>, vertexPtrHash> _arrivals;
+    std::map<sequentialVertex*, std::map<sequentialVertex*, double, vertexPtrEqual>, vertexPtrEqual> _arrivals;
 
     // for topological sorting.
     std::unordered_map<std::string, int> _vertex_to_degree;
 
     // for finding lowest common ancestor.
     sequentialVertex* _virtual_root;
-    std::unordered_map<sequentialVertex*, sequentialVertex*, vertexPtrHash> _vertex_to_ancestor;
-    std::unordered_map<sequentialVertex*, bool, vertexPtrHash> _visited;
+    std::unordered_map<sequentialVertex*, sequentialVertex*, vertexPtrHash, vertexPtrEqual> _vertex_to_ancestor;
+    std::unordered_map<sequentialVertex*, bool, vertexPtrHash, vertexPtrEqual> _visited;
 
     // for record the path.
     std::stack<sequentialVertex*> _stack;

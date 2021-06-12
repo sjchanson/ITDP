@@ -15,6 +15,8 @@ class parameter {
 public:
     double skew_flag;  // Set mapping skew value in no setup violation case.
     int side_length;   // Search window's side length.
+    double extra_dist; // for the extra_dist
+
 
     parameter();
     void reset() {}

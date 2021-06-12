@@ -252,7 +252,7 @@ void sequentialGraph::updateHop(sequentialVertex* vertex_1, sequentialVertex* ve
         v->get_descendants().erase(vertex_2);
         v->add_descendants(fusion_vertex);
 
-        std::set<sequentialVertex*> union_descendants;
+        std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_descendants;
         std::set_union(v->get_descendants().begin(), v->get_descendants().end(), vertex_2->get_descendants().begin(),
                        vertex_2->get_descendants().end(), inserter(union_descendants, union_descendants.begin()));
         v->get_descendants() = union_descendants;
@@ -263,7 +263,7 @@ void sequentialGraph::updateHop(sequentialVertex* vertex_1, sequentialVertex* ve
         v->get_ancestors().erase(vertex_2);
         v->add_ancestors(fusion_vertex);
 
-        std::set<sequentialVertex*> union_ancestors;
+        std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_ancestors;
         std::set_union(v->get_ancestors().begin(), v->get_ancestors().end(), vertex_2->get_ancestors().begin(),
                        vertex_2->get_ancestors().end(), inserter(union_ancestors, union_ancestors.begin()));
         v->get_descendants() = union_ancestors;
@@ -274,7 +274,7 @@ void sequentialGraph::updateHop(sequentialVertex* vertex_1, sequentialVertex* ve
         v->get_descendants().erase(vertex_1);
         v->add_descendants(fusion_vertex);
 
-        std::set<sequentialVertex*> union_descendants;
+        std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_descendants;
         std::set_union(v->get_descendants().begin(), v->get_descendants().end(), vertex_1->get_descendants().begin(),
                        vertex_1->get_descendants().end(), inserter(union_descendants, union_descendants.begin()));
         v->get_descendants() = union_descendants;
@@ -285,7 +285,7 @@ void sequentialGraph::updateHop(sequentialVertex* vertex_1, sequentialVertex* ve
         v->get_ancestors().erase(vertex_1);
         v->add_ancestors(fusion_vertex);
 
-        std::set<sequentialVertex*> union_ancestors;
+        std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_ancestors;
         std::set_union(v->get_ancestors().begin(), v->get_ancestors().end(), vertex_1->get_ancestors().begin(),
                        vertex_1->get_ancestors().end(), inserter(union_ancestors, union_ancestors.begin()));
         v->get_descendants() = union_ancestors;
@@ -413,24 +413,24 @@ void sequentialGraph::initSeqentialPair(int side_length, int core_x, int core_y,
  * @param v2
  */
 void sequentialGraph::updateArrival(sequentialVertex* v1, sequentialVertex* v2, double distance) {
-    auto iter_1 = _arrivals.find(v1);
-    if (iter_1 == _arrivals.end()) {
-        std::map<sequentialVertex*, double, vertexPtrHash> arrival;
-        arrival[v2] = distance;
-        _arrivals[v1] = arrival;
+    auto v1_iter_1 = _arrivals.find(v1);
+    auto& v1_map = (*v1_iter_1).second;
+    auto v1_iter_2 = v1_map.find(v2);
+    if (v1_iter_2 == v1_map.end()) {
+        v1_map[v2] = distance;
     } else {
-        auto& arrival = (*iter_1).second;
-        arrival[v2] = distance;
+        auto& arrival = *v1_iter_2;
+        arrival.second = distance;
     }
 
-    auto iter_2 = _arrivals.find(v2);
-    if (iter_2 == _arrivals.end()) {
-        std::map<sequentialVertex*, double, vertexPtrHash> arrival;
-        arrival[v1] = distance;
-        _arrivals[v2] = arrival;
+    auto v2_iter_1 = _arrivals.find(v2);
+    auto& v2_map = (*v2_iter_1).second;
+    auto v2_iter_2 = v2_map.find(v1);
+    if (v2_iter_2 == v2_map.end()) {
+        v2_map[v1] = distance;
     } else {
-        auto& arrival = (*iter_2).second;
-        arrival[v1] = distance;
+        auto& arrival = *v2_iter_2;
+        arrival.second = distance;
     }
 }
 
@@ -737,8 +737,8 @@ void sequentialGraph::updateCoordMapping() {
 
         _x_coords.push_back(x_coord);
         _y_coords.push_back(y_coord);
-        _x_to_vertexs.emplace(x_coord, *iter);
-        _y_to_vertexs.emplace(y_coord, *iter);
+        _x_to_vertexs.emplace(x_coord, (*iter).second);
+        _y_to_vertexs.emplace(y_coord, (*iter).second);
     }
 
     std::sort(_x_coords.begin(), _y_coords.end());

@@ -246,7 +246,7 @@ void sequentialOperator::ergodicGenerateGraph(std::stack<sequentialBase*>& stack
         if (_cell2Visited.find(sink_cell->name) != _cell2Visited.end()) {
             continue;
         }
-        // _cell2Visited[sink_cell->name] = 1;  // signed for avoiding ring in one traverse.
+        _cell2Visited[sink_cell->name] = 1;  // signed for avoiding ring in one traverse.
 
         if (sink_pin->isFlopInput) {
             sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _para);
@@ -553,7 +553,7 @@ void sequentialOperator::updateVertexFusion() {
         }
 
         // make vertex fusion.
-        _graph->makeVertexFusion(v1, v2, new sequentialVertex(new_node));
+        _graph->makeVertexFusion(v1, v2, new sequentialVertex(new_node), _para->extra_dist);
     }
 }
 
@@ -567,8 +567,9 @@ void sequentialOperator::printGraphInfo() {
     uint v_pi = 0, v_po = 0, v_ff_pi = 0, v_ff_po = 0, v_ff = 0;
 
     std::unordered_map<std::string, sequentialVertex*>::iterator iter;
+    std::unordered_map<std::string, sequentialVertex*> vertexes = _graph->get_vertexes();
 
-    for (iter = _graph->get_vertexes().begin(); iter != _graph->get_vertexes().end(); iter++) {
+    for (iter = vertexes.begin(); iter != vertexes.end(); iter++) {
         if ((*iter).second->get_base()->get_type() == 3) {
             v_ff++;
             auto seq_obj = idToSeqFF((*iter).second->get_base()->get_id());
@@ -659,6 +660,12 @@ void sequentialOperator::plot() {
     feed << endl;
 
     for (auto& vertex : _graph->get_vertexes()) {
+        auto base = vertex.second->get_base();
+
+        // pi po case.
+        if (base->get_type() == 0 || base->get_type() == 1) {
+            continue;
+        }
         auto seq_obj = idToSeqFF(vertex.second->get_base()->get_id());  // can do that?
         cell* cur_cell = seq_obj->get_flipflop();
         if (cur_cell) {
