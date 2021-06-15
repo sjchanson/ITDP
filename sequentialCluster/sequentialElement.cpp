@@ -7,14 +7,29 @@ coordinate::coordinate(int px, int py) {
 
 bool coordinate::isLegalCoord() { return !(x == INT_MAX || y == INT_MAX); }
 
-sequentialBase::sequentialBase()
-    : _type(UINT_MAX), _id(UINT_MAX), _name(""), _skew(DBL_MAX), _coord(INT_MAX, INT_MAX) {}
+sequentialBase::sequentialBase() : _type(UINT_MAX), _id(UINT_MAX), _name(""), _coord(INT_MAX, INT_MAX) {}
+
+double sequentialBase::get_avg_skew() {
+    double sum_skew = 0.0;
+    for (auto iter = _skews.begin(); iter != _skews.end(); iter++) {
+        sum_skew += (*iter).second;
+    }
+
+    return sum_skew / _skews.size();
+}
+
+double sequentialBase::get_max_skew() {
+    double max_skew = 0.0;
+    for (auto iter = _skews.begin(); iter != _skews.end(); iter++) {
+        max_skew > (*iter).second ? max_skew : max_skew = (*iter).second;
+    }
+    return max_skew;
+}
 
 sequentialPrimaryIO::sequentialPrimaryIO() : sequentialBase(), _is_pi(0), _is_po(0), _pin(nullptr) {}
 
 sequentialPrimaryIO::sequentialPrimaryIO(pin* pin) : sequentialPrimaryIO() {
     _name = pin->name;
-    _skew = 0.0;
     set_coord(coordinate(pin->x_coord, pin->y_coord));
     if (pin->type == 1) {
         _type = 0;
@@ -75,18 +90,12 @@ sequentialFlipFlop::~sequentialFlipFlop() {
 }
 
 void sequentialFlipFlop::update() {
-    if (_input_pin->lateSlk <= 0) {
-        _skew = abs(_input_pin->lateSlk) + _input_pin->earlySlk;
-    } else {
-        _skew = _para->skew_flag;
-    }
-    set_coord(coordinate(_flipflop->x_coord, _flipflop->y_coord));
+    // TODO.
 }
 
 sequentialCluster::sequentialCluster(std::string name) {
     _type = 4;
     _name = name;
-    _skew = 0;
 }
 
 void sequentialCluster::add_flipflop(sequentialFlipFlop* ff) {

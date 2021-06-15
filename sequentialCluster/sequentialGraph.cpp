@@ -203,6 +203,7 @@ void sequentialGraph::hopForwardDFS(std::stack<sequentialVertex*>& stack) {
         }
         cur_v->add_descendants(next_v);
     }
+
     stack.pop();
 }
 
@@ -306,15 +307,16 @@ void sequentialGraph::initDegree() {
 
 void sequentialGraph::getDirectHopSkew(sequentialVertex* v1, sequentialVertex* v2, double& skew) {
     for (auto edge : v1->get_src_edges()) {
-        if (edge->get_src() == v2) {
-            skew = v1->get_base()->get_skew();
+        // can not compare the pointer.
+        if (*(edge->get_src()) == *v2) {
+            skew = v1->get_base()->get_avg_skew();
             return;
         }
     }
 
     for (auto edge : v2->get_src_edges()) {
-        if (edge->get_src() == v1) {
-            skew = v2->get_base()->get_skew();
+        if (*(edge->get_src()) == *v1) {
+            skew = v2->get_base()->get_avg_skew();
             return;
         }
     }
@@ -325,13 +327,14 @@ void sequentialGraph::getDirectHopSkew(sequentialVertex* v1, sequentialVertex* v
 
 bool sequentialGraph::isDirectHop(sequentialVertex* v1, sequentialVertex* v2) {
     for (auto edge : v1->get_src_edges()) {
-        if (edge->get_src() == v2) {
+        // must take care the compare.
+        if (*(edge->get_src()) == *v2) {
             return true;
         }
     }
 
     for (auto edge : v2->get_src_edges()) {
-        if (edge->get_src() == v1) {
+        if (*(edge->get_src()) == *v1) {
             return true;
         }
     }
@@ -359,8 +362,17 @@ bool sequentialGraph::reduceDegree(sequentialVertex* v, std::unordered_map<std::
 void sequentialGraph::initSeqentialPair(int side_length, int core_x, int core_y, double max_skew) {
     std::unordered_map<std::string, sequentialVertex*>::iterator iter;
 
+    double begin, end;
+    begin = microtime();
     for (iter = _vertexes.begin(); iter != _vertexes.end(); iter++) {
-        auto vertex_base = (*iter).second->get_base();
+        auto cur_vertex = (*iter).second;
+
+        // init the vistor and the ancestor.
+        _visited[cur_vertex] = false;
+        _vertex_to_ancestor[cur_vertex] = cur_vertex;
+
+        // get region vertexes.
+        auto vertex_base = cur_vertex->get_base();
         if (vertex_base->get_type() == 3) {
             int low_x = vertex_base->get_coord().x - side_length / 2;
             int low_y = vertex_base->get_coord().y - side_length / 2;
@@ -371,35 +383,39 @@ void sequentialGraph::initSeqentialPair(int side_length, int core_x, int core_y,
             region_vertexes = this->getRegionVertexes(low_x, low_y, top_x, top_y);
 
             for (auto region_vertex : region_vertexes) {
-                if ((*iter).second == region_vertex) {  // the vertex itself.
+                if (cur_vertex == region_vertex) {  // the vertex itself.
                     continue;
                 }
 
                 // ring case
-                if (this->findRing((*iter).second, region_vertex)) {
+                if (this->findRing(cur_vertex, region_vertex)) {
                     continue;
                 }
 
-                vertexPair* pair = new vertexPair((*iter).second, region_vertex);
+                vertexPair* pair = new vertexPair(cur_vertex, region_vertex);
 
                 // direct connecting case
-                if (isDirectHop((*iter).second, region_vertex)) {
+                if (isDirectHop(cur_vertex, region_vertex)) {
                     sequentialPair* seq_pair = new sequentialPair(pair);
                     double skew;
-                    getDirectHopSkew((*iter).second, region_vertex, skew);
+                    getDirectHopSkew(cur_vertex, region_vertex, skew);
+                    // Flipflop multi input case.
+
                     double distance = calDistance(pair, skew, core_x, core_y, max_skew);
                     seq_pair->set_distance(distance);  // setting direct distance.
                     _sequential_pairs.insert(seq_pair);
 
                     // update the arrivals.
-                    updateArrival((*iter).second, region_vertex, distance);
+                    updateArrival(cur_vertex, region_vertex, distance);
 
                 } else {
-                    updateArrival((*iter).second, region_vertex, DBL_MAX);
+                    updateArrival(cur_vertex, region_vertex, DBL_MAX);
                 }
             }
         }
     }
+    end = microtime();
+    std::cout << "init the arrival Timing : " << end - begin << "'s" << std::endl;
 
     // construct arrivals.
     addVirtualRoot();
@@ -414,23 +430,25 @@ void sequentialGraph::initSeqentialPair(int side_length, int core_x, int core_y,
  */
 void sequentialGraph::updateArrival(sequentialVertex* v1, sequentialVertex* v2, double distance) {
     auto v1_iter_1 = _arrivals.find(v1);
-    auto& v1_map = (*v1_iter_1).second;
-    auto v1_iter_2 = v1_map.find(v2);
-    if (v1_iter_2 == v1_map.end()) {
-        v1_map[v2] = distance;
+    // if has not init the _arrival.
+    if (v1_iter_1 == _arrivals.end()) {
+        std::map<sequentialVertex*, double, vertexPtrLess> init_map;
+        init_map[v2] = distance;
+        _arrivals[v1] = init_map;
     } else {
-        auto& arrival = *v1_iter_2;
-        arrival.second = distance;
+        auto& v1_map = (*v1_iter_1).second;
+        v1_map[v2] = distance;
     }
 
     auto v2_iter_1 = _arrivals.find(v2);
-    auto& v2_map = (*v2_iter_1).second;
-    auto v2_iter_2 = v2_map.find(v1);
-    if (v2_iter_2 == v2_map.end()) {
-        v2_map[v1] = distance;
+    // if has not init the _arrival.
+    if (v2_iter_1 == _arrivals.end()) {
+        std::map<sequentialVertex*, double, vertexPtrLess> init_map;
+        init_map[v1] = distance;
+        _arrivals[v2] = init_map;
     } else {
-        auto& arrival = *v2_iter_2;
-        arrival.second = distance;
+        auto& v2_map = (*v2_iter_1).second;
+        v2_map[v1] = distance;
     }
 }
 
@@ -471,7 +489,7 @@ std::set<sequentialVertex*> sequentialGraph::getRegionVertexes(int lx, int ly, i
     for (int i = 0; i < _x_coords.size(); i++) {
         if (_x_coords[i] <= lx) {
             low_subscript = i;
-        } else if (_x_coords[i] > lx && _x_coords[i] <= uy) {
+        } else if (_x_coords[i] > lx && _x_coords[i] <= ux) {
             high_subscript = i;
         } else {
             break;
@@ -505,7 +523,7 @@ std::set<sequentialVertex*> sequentialGraph::getXCoordVertexes(int x) {
         sequentialVertex* vertex = _x_to_vertexs.find(x)->second;
         x_vertexes.insert(vertex);
     } else if (key_num > 1) {
-        auto range = _x_to_vertexs.equal_range(key_num);
+        auto range = _x_to_vertexs.equal_range(x);
         while (range.first != range.second) {
             sequentialVertex* vertex = range.first->second;
             x_vertexes.insert(vertex);
@@ -518,10 +536,10 @@ std::set<sequentialVertex*> sequentialGraph::getXCoordVertexes(int x) {
 double sequentialGraph::getDirectConnectingSkew(sequentialVertex* v1, sequentialVertex* v2) {
     for (auto edge : v2->get_src_edges()) {
         if (edge->get_src() == v1) {
-            return v2->get_base()->get_skew();
+            return v2->get_base()->get_avg_skew();
         }
     }
-    return v1->get_base()->get_skew();
+    return v1->get_base()->get_avg_skew();
 }
 
 // void sequentialGraph::updatePairSkew(sequentialVertex* root) {
@@ -563,8 +581,8 @@ double sequentialGraph::getDirectConnectingSkew(sequentialVertex* v1, sequential
 sequentialVertex* sequentialGraph::findAncestor(sequentialVertex* vertex, double& skew) {
     sequentialVertex* cur_v = vertex;
     double skew_sum = 0;
-    while (!(cur_v == _vertex_to_ancestor[cur_v])) {
-        skew_sum += cur_v->get_base()->get_skew();
+    while (!(*cur_v == *(_vertex_to_ancestor[cur_v]))) {
+        skew_sum += cur_v->get_base()->get_avg_skew();
 
         cur_v = _vertex_to_ancestor[cur_v];
     }
@@ -630,12 +648,12 @@ bool sequentialGraph::findRing(sequentialVertex* vertex_1, sequentialVertex* ver
     }
 
     for (auto vertex : vertex_1->get_ancestors()) {
-        if (vertex == vertex_2) {
+        if (*vertex == *vertex_2) {
             return true;
         }
     }
     for (auto vertex : vertex_1->get_descendants()) {
-        if (vertex == vertex_2) {
+        if (*vertex == *vertex_2) {
             return true;
         }
     }
@@ -657,6 +675,10 @@ void sequentialGraph::addVirtualRoot() {
     }
 
     _virtual_root = root;
+
+    // make the virtual root flag.
+    _vertex_to_ancestor[_virtual_root] = _virtual_root;
+    _visited[_virtual_root] = false;
 }
 
 /**
@@ -679,9 +701,19 @@ void sequentialGraph::leastCommonAncestorDFS(sequentialVertex* root, int core_x,
 
         // vistied ?
         double skew_1, skew_2, distance;
-        auto iter_1 = _arrivals.find(root)->second;  // must can find.
+        auto iter_map = _arrivals.find(root);
+
+        // 1. PI/PO not consider. 2. Flipflop not have search vertex.
+        if (iter_map == _arrivals.end()) {
+            continue;
+        }
+
+        // get the arrival map.
+        auto& iter_1 = iter_map->second;
 
         std::map<sequentialVertex*, double, vertexPtrHash>::iterator iter;
+
+
 
         for (iter = iter_1.begin(); iter != iter_1.end(); iter++) {
             sequentialVertex* visit_v = (*iter).first;
@@ -715,10 +747,10 @@ double sequentialGraph::findAncestorByStack(std::stack<sequentialVertex*> stack,
     double skew = 0;
     while (!stack.empty()) {
         auto cur_vertex = stack.top();
-        if (cur_vertex == ancestor) {
+        if (*cur_vertex == *ancestor) {
             break;
         }
-        skew += cur_vertex->get_base()->get_skew();
+        skew += cur_vertex->get_base()->get_avg_skew();
         stack.pop();
     }
     return skew;
@@ -732,16 +764,20 @@ void sequentialGraph::updateCoordMapping() {
     std::unordered_map<std::string, sequentialVertex*>::iterator iter;
 
     for (iter = _vertexes.begin(); iter != _vertexes.end(); iter++) {
-        int x_coord = (*iter).second->get_base()->get_coord().x;
-        int y_coord = (*iter).second->get_base()->get_coord().y;
+        auto cur_base = (*iter).second->get_base();
+        // flipflop case.
+        if (cur_base->get_type() == 3) {
+            int x_coord = cur_base->get_coord().x;
+            int y_coord = cur_base->get_coord().y;
 
-        _x_coords.push_back(x_coord);
-        _y_coords.push_back(y_coord);
-        _x_to_vertexs.emplace(x_coord, (*iter).second);
-        _y_to_vertexs.emplace(y_coord, (*iter).second);
+            _x_coords.push_back(x_coord);
+            _y_coords.push_back(y_coord);
+            _x_to_vertexs.emplace(x_coord, (*iter).second);
+            _y_to_vertexs.emplace(y_coord, (*iter).second);
+        }
     }
 
-    std::sort(_x_coords.begin(), _y_coords.end());
+    std::sort(_x_coords.begin(), _x_coords.end());
     std::sort(_y_coords.begin(), _y_coords.end());
 }
 
@@ -913,4 +949,21 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
     vertex_1 = nullptr;
     delete vertex_2;
     vertex_2 = nullptr;
+}
+
+bool sequentialGraph::isVertexExist(std::string vertex_name) {
+    auto v = _vertexes.find(vertex_name);
+    if (v == _vertexes.end()) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+sequentialVertex* sequentialGraph::get_vertex(std::string vertex_name) {
+    if (isVertexExist(vertex_name)) {
+        return _vertexes[vertex_name];
+    } else {
+        return nullptr;
+    }
 }

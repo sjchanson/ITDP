@@ -165,6 +165,10 @@ struct vertexPtrHash {
 };
 
 struct vertexPtrEqual {
+    bool operator()(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) const { return (*v_ptr1) == (*v_ptr2); }
+};
+
+struct vertexPtrLess {
     bool operator()(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) const { return (*v_ptr1) < (*v_ptr2); }
 };
 
@@ -231,6 +235,9 @@ public:
 
     std::set<sequentialPair*, sequentialPairCmp> get_sequential_pairs() const { return _sequential_pairs; }
 
+    bool isVertexExist(std::string vertex_name);
+    sequentialVertex* get_vertex(std::string vertex_name);
+
 private:
     Logger* _log;
     // using unordered_map to store vertexes.
@@ -249,7 +256,7 @@ private:
 
     // for sequential pair
     std::set<sequentialPair*, sequentialPairCmp> _sequential_pairs;
-    std::map<sequentialVertex*, std::map<sequentialVertex*, double, vertexPtrEqual>, vertexPtrEqual> _arrivals;
+    std::map<sequentialVertex*, std::map<sequentialVertex*, double, vertexPtrLess>, vertexPtrLess> _arrivals;
 
     // for topological sorting.
     std::unordered_map<std::string, int> _vertex_to_degree;

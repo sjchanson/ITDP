@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <unordered_set>
 
 #include "../evaluate.h"
@@ -37,20 +38,30 @@ public:
     uint get_type() const { return _type; }
     uint get_id() const { return _id; }
     string get_name() const { return _name; }
-    double get_skew() const { return _skew; }
+    double get_avg_skew();
+    double get_max_skew();
     coordinate get_coord() const { return _coord; }
 
     void set_id(uint idx) { _id = idx; }
     void set_coord(coordinate coord) { _coord = coord; }
-    void set_skew(double skew) { _skew = skew; }
+    void add_skew(sequentialBase* base, double skew) { _skews[base] = skew; }
 
     virtual void update() = 0;
+
+    // override the compare function and hash.
+    bool operator<(const sequentialBase& base) { return _name < base.get_name(); }
+    struct basePtrHash {
+        size_t operator()(const sequentialBase* base) const { return std::hash<string>()(base->get_name()); }
+    };
+    struct basePtrEqual {
+        bool operator()(sequentialBase* base_1, sequentialBase* base_2) const { return (*base_1) < (*base_2); }
+    };
 
 protected:
     uint _type;  // 0->PI , 1->PO , 2->LogicCell 3->FlipFlop , 4->Cluster
     uint _id;    // Corresponding to the position of the real element.
     string _name;
-    double _skew;
+    std::unordered_map<sequentialBase*, double, basePtrHash, basePtrEqual> _skews;
     coordinate _coord;
 };
 
@@ -101,6 +112,7 @@ public:
     unsigned isFFPo() const { return _is_ff_po; }
     sequentialCluster* get_cluster() const { return _belong_cluster; }
     cell* get_flipflop() const { return _flipflop; }
+    pin* get_input_pin() const { return _input_pin; }
 
     void set_ff_pi() { _is_ff_pi = 1; }
     void set_ff_po() { _is_ff_po = 1; }
@@ -120,7 +132,6 @@ public:
     sequentialCluster() = default;
     sequentialCluster(std::string name);
     ~sequentialCluster() = default;
-
 
     void update();
 
