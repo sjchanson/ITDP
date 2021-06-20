@@ -66,6 +66,8 @@ private:
 
     std::unordered_map<std::string, bool> _is_visited_ff;
     std::unordered_map<std::string, unsigned> _cell2Visited;
+    std::unordered_map<std::string, bool> _is_visited_logic;
+    std::unordered_map<std::string, sequentialLogicCell*> _name_to_logic;
 
     // normalization
     double _core_x;

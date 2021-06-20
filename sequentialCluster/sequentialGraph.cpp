@@ -130,6 +130,16 @@ sequentialGraph::~sequentialGraph() {
     _arcs.clear();
 }
 
+void sequentialGraph::removeVertex(sequentialVertex* vertex) {
+    auto iter = _vertexes.find(vertex->get_name());
+    if (iter != _vertexes.end()) {
+        _vertexes.erase(iter);
+    } else {
+        _log->error("Error in remove vertex", 1, 1);
+    }
+    return;
+}
+
 void sequentialGraph::add_vertex(std::string name, sequentialVertex* v) {
     if (_vertexes.find(name) != _vertexes.end()) {
         _log->error("ERROR in add vertex.", 1, 1);
@@ -381,6 +391,7 @@ void sequentialGraph::initSeqentialPair(int side_length, int core_x, int core_y,
 
             std::set<sequentialVertex*> region_vertexes;
             region_vertexes = this->getRegionVertexes(low_x, low_y, top_x, top_y);
+            _log->printInt(cur_vertex->get_name() + " search window's num", region_vertexes.size() - 1, 1);
 
             for (auto region_vertex : region_vertexes) {
                 if (cur_vertex == region_vertex) {  // the vertex itself.
@@ -419,7 +430,11 @@ void sequentialGraph::initSeqentialPair(int side_length, int core_x, int core_y,
 
     // construct arrivals.
     addVirtualRoot();
+
+    begin = microtime();
     leastCommonAncestorDFS(_virtual_root, core_x, core_y, max_skew);
+    end = microtime();
+    std::cout << " init all vertexes distance : " << end - begin << "'s" << std::endl;
 }
 
 /**
@@ -501,6 +516,10 @@ std::set<sequentialVertex*> sequentialGraph::getRegionVertexes(int lx, int ly, i
         std::set<sequentialVertex*> x_vertexes;
         x_vertexes = this->getXCoordVertexes(_x_coords[i]);
         for (auto vertex : x_vertexes) {
+            // select the flipflop case.
+            if (vertex->get_base()->get_type() != 3) {
+                continue;
+            }
             int vertex_y = vertex->get_base()->get_coord().y;
             if (vertex_y >= ly && vertex_y <= uy) {
                 region_vertexes.insert(vertex);
@@ -697,41 +716,47 @@ void sequentialGraph::leastCommonAncestorDFS(sequentialVertex* root, int core_x,
 
     for (auto edge : root->get_sink_edges()) {
         auto cur_v = edge->get_sink();
-        leastCommonAncestorDFS(cur_v, core_x, core_y, max_skew);
 
-        // vistied ?
-        double skew_1, skew_2, distance;
-        auto iter_map = _arrivals.find(root);
-
-        // 1. PI/PO not consider. 2. Flipflop not have search vertex.
-        if (iter_map == _arrivals.end()) {
+        // continue if cur_v has been visited.
+        if (_visited[cur_v]) {
             continue;
         }
 
-        // get the arrival map.
-        auto& iter_1 = iter_map->second;
+        leastCommonAncestorDFS(cur_v, core_x, core_y, max_skew);
 
-        std::map<sequentialVertex*, double, vertexPtrHash>::iterator iter;
+        // vistied ?
+        double skew_1 = UINT_MAX;
+        double skew_2 = UINT_MAX;
+        double distance = UINT_MAX;
+        auto iter_map = _arrivals.find(cur_v);
 
+        // 1. PI/PO not consider. 2. Flipflop not have search vertex.
+        if (iter_map != _arrivals.end()) {
+            // get the arrival map.
+            auto& iter_1 = iter_map->second;
 
+            std::map<sequentialVertex*, double, vertexPtrHash>::iterator iter;
 
-        for (iter = iter_1.begin(); iter != iter_1.end(); iter++) {
-            sequentialVertex* visit_v = (*iter).first;
-            if (_visited[visit_v] && (*iter).second == DBL_MAX) {  // has no arrange the distance.
-                sequentialVertex* ancestor = findAncestor(visit_v, skew_1);
-                skew_2 = findAncestorByStack(_stack, ancestor);
+            for (iter = iter_1.begin(); iter != iter_1.end(); iter++) {
+                sequentialVertex* visit_v = (*iter).first;
+                bool flag = _visited[visit_v];
+                if (flag && (*iter).second == DBL_MAX) {  // has no arrange the distance.
 
-                // calculate the skew disfference.
-                vertexPair* pair = new vertexPair(cur_v, visit_v);
-                distance = calDistance(pair, abs(skew_1 - skew_2), core_x, core_y, max_skew);
+                    sequentialVertex* ancestor = findAncestor(visit_v, skew_1);
+                    skew_2 = findAncestorByStack(_stack, ancestor);
 
-                // update the sequential pairs.
-                sequentialPair* seq_pair = new sequentialPair(pair);
-                seq_pair->set_distance(distance);
-                _sequential_pairs.insert(seq_pair);
+                    // calculate the skew disfference.
+                    vertexPair* pair = new vertexPair(cur_v, visit_v);
+                    distance = calDistance(pair, abs(skew_1 - skew_2), core_x, core_y, max_skew);
 
-                // update the metrix.
-                iter_1[visit_v] = distance;
+                    // update the sequential pairs.
+                    sequentialPair* seq_pair = new sequentialPair(pair);
+                    seq_pair->set_distance(distance);
+                    _sequential_pairs.insert(seq_pair);
+
+                    // update the metrix.
+                    updateArrival(cur_v, visit_v, distance);
+                }
             }
         }
 
@@ -739,11 +764,10 @@ void sequentialGraph::leastCommonAncestorDFS(sequentialVertex* root, int core_x,
         _vertex_to_ancestor[cur_v] = root;
         _stack.pop();
     }
-    _visited[root] = true;
+    // _visited[root] = true;
 }
 
 double sequentialGraph::findAncestorByStack(std::stack<sequentialVertex*> stack, sequentialVertex* ancestor) {
-    auto end_vertex = stack.top();
     double skew = 0;
     while (!stack.empty()) {
         auto cur_vertex = stack.top();
@@ -785,14 +809,25 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
                                        sequentialVertex* new_vertex, double extra_dist) {
     // add src.
     for (auto edge : vertex_1->get_src_edges()) {
+        // direct connect case.
+        if (*vertex_2 == *(edge->get_src())) {
+            continue;
+        }
+
         edge->updateSink(new_vertex);
         new_vertex->add_src_edges(edge);
     }
+
     // should take care of repeat add.
     for (auto edge : vertex_2->get_src_edges()) {
+        // direct connect case.
+        if (*vertex_1 == *(edge->get_src())) {
+            continue;
+        }
+
         bool is_repeat = false;
         for (auto e : new_vertex->get_src_edges()) {
-            if (e->get_src() == edge->get_src()) {
+            if (*(e->get_src()) == *(edge->get_src())) {
                 is_repeat = true;
             }
         }
@@ -805,11 +840,21 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
 
     // add sink.
     for (auto edge : vertex_1->get_sink_edges()) {
+        // direct connect case.
+        if (*vertex_2 == *(edge->get_sink())) {
+            continue;
+        }
+
         edge->updateSrc(new_vertex);
         new_vertex->add_sink_edges(edge);
     }
     // should take care of repeat add.
     for (auto edge : vertex_2->get_sink_edges()) {
+        // direct connect case.
+        if (*vertex_1 == *(edge->get_sink())) {
+            continue;
+        }
+
         bool is_repeat = false;
         for (auto e : new_vertex->get_sink_edges()) {
             if (e->get_sink() == edge->get_sink()) {
@@ -827,11 +872,17 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
     for (auto cur_v : vertex_1->get_ancestors()) {
         auto& descendants = cur_v->get_descendants();
         auto iter_1 = descendants.find(vertex_1);
-        descendants.erase(iter_1);
-        auto iter_2 = descendants.find(vertex_2);
-        descendants.erase(iter_2);
-        cur_v->add_descendants(new_vertex);
+        // must take care of judging.
+        if (iter_1 != descendants.end()) {
+            descendants.erase(iter_1);
+        }
 
+        auto iter_2 = descendants.find(vertex_2);
+        if (iter_2 != descendants.end()) {
+            descendants.erase(iter_2);
+        }
+
+        cur_v->add_descendants(new_vertex);
         std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_descendants;
         std::set_union(descendants.begin(), descendants.end(), vertex_2->get_descendants().begin(),
                        vertex_2->get_descendants().end(), inserter(union_descendants, union_descendants.begin()));
@@ -840,10 +891,15 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
 
     for (auto cur_v : vertex_2->get_ancestors()) {
         auto& descendants = cur_v->get_descendants();
-        auto iter_1 = descendants.find(vertex_1);
-        descendants.erase(iter_1);
-        auto iter_2 = descendants.find(vertex_2);
-        descendants.erase(iter_2);
+        const auto& iter_1 = descendants.find(vertex_1);
+        if (iter_1 != descendants.end()) {
+            descendants.erase(iter_1);
+        }
+        const auto& iter_2 = descendants.find(vertex_2);
+        if (iter_2 != descendants.end()) {
+            descendants.erase(iter_2);
+        }
+
         cur_v->add_descendants(new_vertex);
 
         std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_descendants;
@@ -855,11 +911,16 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
     for (auto cur_v : vertex_1->get_descendants()) {
         auto& ancestors = cur_v->get_ancestors();
         auto iter_1 = ancestors.find(vertex_1);
-        ancestors.erase(iter_1);
-        auto iter_2 = ancestors.find(vertex_2);
-        ancestors.erase(iter_2);
-        cur_v->add_ancestors(new_vertex);
+        if (iter_1 != ancestors.end()) {
+            ancestors.erase(iter_1);
+        }
 
+        auto iter_2 = ancestors.find(vertex_2);
+        if (iter_2 != ancestors.end()) {
+            ancestors.erase(iter_2);
+        }
+
+        cur_v->add_ancestors(new_vertex);
         std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_ancestors;
         std::set_union(ancestors.begin(), ancestors.end(), vertex_2->get_ancestors().begin(),
                        vertex_2->get_ancestors().end(), inserter(union_ancestors, union_ancestors.begin()));
@@ -870,11 +931,16 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
     for (auto cur_v : vertex_2->get_descendants()) {
         auto& ancestors = cur_v->get_ancestors();
         auto iter_1 = ancestors.find(vertex_1);
-        ancestors.erase(iter_1);
-        auto iter_2 = ancestors.find(vertex_2);
-        ancestors.erase(iter_2);
-        cur_v->add_ancestors(new_vertex);
+        if (iter_1 != ancestors.end()) {
+            ancestors.erase(iter_1);
+        }
 
+        auto iter_2 = ancestors.find(vertex_2);
+        if (iter_2 != ancestors.end()) {
+            ancestors.erase(iter_2);
+        }
+
+        cur_v->add_ancestors(new_vertex);
         std::set<sequentialVertex*, sequentialVertex::vertexCmp> union_ancestors;
         std::set_union(ancestors.begin(), ancestors.end(), vertex_1->get_ancestors().begin(),
                        vertex_1->get_ancestors().end(), inserter(union_ancestors, union_ancestors.begin()));
@@ -884,31 +950,40 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
 
     // update the arrival and the sequential pairs.
 
-    std::map<sequentialVertex*, double, vertexPtrHash> new_map;
+    std::map<sequentialVertex*, double, vertexPtrLess> new_map;
 
-    auto map_1 = _arrivals.find(vertex_1)->second;
-    auto map_2 = _arrivals.find(vertex_2)->second;
+    auto& map_1 = _arrivals.find(vertex_1)->second;
+    auto& map_2 = _arrivals.find(vertex_2)->second;
 
-    std::map<sequentialVertex*, double, vertexPtrHash>::iterator iter_1;
-    std::map<sequentialVertex*, double, vertexPtrHash>::iterator iter_2;
+    std::map<sequentialVertex*, double, vertexPtrLess>::iterator iter_1;
+    std::map<sequentialVertex*, double, vertexPtrLess>::iterator iter_2;
 
     for (iter_1 = map_1.begin(); iter_1 != map_1.end(); iter_1++) {
         // delete the sequential pair.
         auto seq_pair_iter = _sequential_pairs.find(new sequentialPair(vertex_1, iter_1->first));
-        _sequential_pairs.erase(seq_pair_iter);
+        if (seq_pair_iter != _sequential_pairs.end()) {
+            _sequential_pairs.erase(seq_pair_iter);
+        }
 
         bool is_existed = false;
         auto v_1 = iter_1->first;
         for (iter_2 = map_2.begin(); iter_2 != map_2.end(); iter_2++) {
             auto v_2 = iter_2->first;
+            // if two vertexes been the fusion vertex.
+            if (*v_2 == *vertex_1) {
+                is_existed = true;
+                break;
+            }
+
             if (v_1 == v_2) {
                 is_existed = true;
                 updateArrival(new_vertex, v_1, (iter_1->second + iter_2->second) / 2);
-                break;
 
                 sequentialPair* new_pair = new sequentialPair(new_vertex, v_1);
                 new_pair->set_distance((iter_1->second + iter_2->second) / 2);
                 _sequential_pairs.insert(new_pair);
+
+                break;
             }
         }
         if (!is_existed) {
@@ -925,8 +1000,14 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
         auto v_2 = iter_2->first;
         for (iter_1 = map_1.begin(); iter_1 != map_1.end(); iter_1++) {
             auto v_1 = iter_1->first;
+            if (*v_1 == *vertex_2) {
+                is_existed = true;
+                break;
+            }
+
             if (v_1 == v_2) {
                 is_existed = true;
+                break;
             }
         }
         if (!is_existed) {
@@ -945,10 +1026,9 @@ void sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVer
     _arrivals.erase(v2_iter);
 
     // delete vertex_1, vertex_2.
-    delete vertex_1;
-    vertex_1 = nullptr;
-    delete vertex_2;
-    vertex_2 = nullptr;
+    this->removeVertex(vertex_1);
+    this->removeVertex(vertex_2);
+    this->add_vertex(new_vertex->get_name(), new_vertex);
 }
 
 bool sequentialGraph::isVertexExist(std::string vertex_name) {

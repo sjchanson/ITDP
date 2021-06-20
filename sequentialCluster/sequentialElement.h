@@ -50,11 +50,13 @@ public:
 
     // override the compare function and hash.
     bool operator<(const sequentialBase& base) { return _name < base.get_name(); }
+    bool operator==(const sequentialBase& base) { return _name == base.get_name(); }
+
     struct basePtrHash {
         size_t operator()(const sequentialBase* base) const { return std::hash<string>()(base->get_name()); }
     };
     struct basePtrEqual {
-        bool operator()(sequentialBase* base_1, sequentialBase* base_2) const { return (*base_1) < (*base_2); }
+        bool operator()(sequentialBase* base_1, sequentialBase* base_2) const { return (*base_1) == (*base_2); }
     };
 
 protected:
@@ -84,20 +86,6 @@ private:
     pin* _pin;
 };
 
-class sequentialLogicCell : public sequentialBase {
-public:
-    sequentialLogicCell();
-    sequentialLogicCell(cell* cell);
-    ~sequentialLogicCell();
-
-    void update() {}
-
-    cell* get_logic_cell() const { return _cell; }
-
-private:
-    cell* _cell;
-};
-
 class sequentialFlipFlop : public sequentialBase {
 public:
     sequentialFlipFlop();
@@ -125,6 +113,24 @@ private:
     pin* _input_pin;
     cell* _flipflop;
     sequentialCluster* _belong_cluster;
+};
+
+class sequentialLogicCell : public sequentialBase {
+public:
+    sequentialLogicCell();
+    sequentialLogicCell(cell* cell);
+    ~sequentialLogicCell();
+
+    void update() {}
+
+    cell* get_logic_cell() const { return _cell; }
+    vector<sequentialBase*> get_arrival_bases() const { return _arrival_bases; }
+    void copy_bases(vector<sequentialBase*>& from);
+    void add_arrival_bases(sequentialBase* s) { _arrival_bases.push_back(s); }
+
+private:
+    cell* _cell;
+    vector<sequentialBase*> _arrival_bases;
 };
 
 class sequentialCluster : public sequentialBase {

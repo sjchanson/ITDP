@@ -59,5 +59,10 @@ int main(int argc, char** argv) {
     // init the sequential pair.
     _cluster_ff->initSequentialPair();
 
+    
+
+    // update vertexes fusion
+    _cluster_ff->updateVertexFusion();
+
     return 0;
 }

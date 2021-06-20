@@ -56,6 +56,10 @@ sequentialLogicCell::sequentialLogicCell(cell* cell) {
 
 sequentialLogicCell::~sequentialLogicCell() { _cell = nullptr; }
 
+void sequentialLogicCell::copy_bases(vector<sequentialBase*>& from) {
+    std::copy(from.begin(), from.end(), std::back_inserter(_arrival_bases));
+}
+
 sequentialFlipFlop::sequentialFlipFlop()
     : sequentialBase()
     , _is_ff_pi(0)

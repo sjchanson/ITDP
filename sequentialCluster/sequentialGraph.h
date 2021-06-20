@@ -66,6 +66,7 @@ public:
         bool operator()(sequentialVertex* left, sequentialVertex* right) const { return *left < *right; }
     };
 
+
     void add_src_edges(sequentialArc* src_edge) { _src_edges.push_back(src_edge); }
     void add_sink_edges(sequentialArc* sink_edge) { _sink_edges.push_back(sink_edge); }
 
@@ -161,7 +162,7 @@ struct sequentialPairCmp {
 };
 
 struct vertexPtrHash {
-    size_t operator()(const sequentialVertex* v_ptr) const { return std::hash<string>()(v_ptr->get_name()); }
+    size_t operator()(const sequentialVertex* v_ptr) const { return std::hash<string>()((*v_ptr).get_name()); }
 };
 
 struct vertexPtrEqual {
@@ -179,6 +180,8 @@ public:
     // copy constructor
     sequentialGraph(const sequentialGraph& obj);
     ~sequentialGraph();
+
+    void removeVertex(sequentialVertex* vertex);
 
     void add_vertex(std::string name, sequentialVertex* v);
     void add_edge(sequentialArc* e);
