@@ -26,6 +26,24 @@ double sequentialBase::get_max_skew() {
     return max_skew;
 }
 
+vector<sequentialBase*> sequentialBase::get_source() {
+    vector<sequentialBase*> sources;
+    for (auto it = _skews.begin(); it != _skews.end(); it++) {
+        auto src = (*it).first;
+        sources.push_back(src);
+    }
+    return sources;
+}
+
+double sequentialBase::get_skew(sequentialBase* base) {
+    auto it = _skews.find(base);
+    if (it == _skews.end()) {
+        return DBL_MAX;
+    } else {
+        return it->second;
+    }
+}
+
 sequentialPrimaryIO::sequentialPrimaryIO() : sequentialBase(), _is_pi(0), _is_po(0), _pin(nullptr) {}
 
 sequentialPrimaryIO::sequentialPrimaryIO(pin* pin) : sequentialPrimaryIO() {

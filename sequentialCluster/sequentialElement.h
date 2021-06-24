@@ -46,6 +46,10 @@ public:
     void set_coord(coordinate coord) { _coord = coord; }
     void add_skew(sequentialBase* base, double skew) { _skews[base] = skew; }
 
+    std::vector<sequentialBase*> get_source();
+
+    double get_skew(sequentialBase* base);
+
     virtual void update() = 0;
 
     // override the compare function and hash.

@@ -30,8 +30,12 @@ struct arrivalDistance {
     arrivalDistance(sequentialBase* base, double dist);
 };
 
-struct arrivalHash {
-    size_t operator()(const sequentialBase*& base_ptr) const { return std::hash<string>()(base_ptr->get_name()); }
+struct baseHash {
+    size_t operator()(const sequentialBase* base_ptr) const { return std::hash<string>()((*base_ptr).get_name()); }
+};
+
+struct baseEqual {
+    bool operator()(sequentialBase* base_ptr1, sequentialBase* base_ptr2) const { return *base_ptr1 == *base_ptr2; }
 };
 
 class sequentialOperator {
@@ -51,6 +55,8 @@ public:
     void test();
     void testDFS(std::stack<sequentialVertex*>& stack);
 
+    void replenishCluster();
+
     void plot();
 
 private:
@@ -68,6 +74,9 @@ private:
     std::unordered_map<std::string, unsigned> _cell2Visited;
     std::unordered_map<std::string, bool> _is_visited_logic;
     std::unordered_map<std::string, sequentialLogicCell*> _name_to_logic;
+
+    std::unordered_set<sequentialCluster*, baseHash, baseEqual> _clusters;
+    std::unordered_set<sequentialFlipFlop*, baseHash, baseEqual> _flipflops;
 
     // normalization
     double _core_x;

@@ -116,6 +116,8 @@ void sequentialOperator::init() {
     }
     _log->printInt("Lack of 'q port' Flipflop", lack_q_cnt, 1);
 
+    double begin, end;
+    begin = microtime();
     for (auto cur_pin : pi_vec) {
         std::stack<sequentialBase*> seq_stack;  // stack for DFS.
 
@@ -136,6 +138,7 @@ void sequentialOperator::init() {
         std::stack<sequentialBase*> seq_stack;  // stack for DFS.
 
         sequentialFlipFlop* ff = new sequentialFlipFlop(flipflop);
+        _flipflops.emplace(ff);  // add.
 
         ff->set_ff_pi();
         // ff->add_skew(ff, 0.0);
@@ -145,11 +148,13 @@ void sequentialOperator::init() {
 
         ergodicGenerateGraph(seq_stack);  // from the FlipFlop, traverse all paths to POs.
     }
+    end = microtime();
+    _log->printTime("Init the sequential graph", end - begin, 1);
+    printGraphInfo();
 
     makeNormalization();
-    _graph->initHop();
 
-    printGraphInfo();
+    _graph->initHop();
 }
 
 /**
@@ -228,6 +233,7 @@ void sequentialOperator::ergodicGenerateGraph(std::stack<sequentialBase*>& stack
         if (sink_pin->isFlopInput && stringToId(_cell_vec[sink_pin->owner]->ports, "q") == UINT_MAX) {
             cell* sink_cell = _cell_vec[sink_pin->owner];
             sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _para);
+            _flipflops.emplace(sink_seq);  // add.
 
             // cur_v is logic cell.
             if (cur_seq->get_type() == 2) {
@@ -260,6 +266,8 @@ void sequentialOperator::ergodicGenerateGraph(std::stack<sequentialBase*>& stack
 
         if (sink_pin->isFlopInput) {
             sequentialFlipFlop* sink_seq = new sequentialFlipFlop(sink_cell, sink_pin, _para);
+            _flipflops.emplace(sink_seq);  // add.
+
             stack.push(sink_seq);
         } else {
             sequentialLogicCell* sink_seq = new sequentialLogicCell(sink_cell);
@@ -542,7 +550,8 @@ void sequentialOperator::initSequentialPair() {
  *
  */
 void sequentialOperator::updateVertexFusion() {
-    while (1) {
+    int clus_num;
+    while (clus_num < _para->clus_num) {
         double begin, end;
         begin = microtime();
         sequentialCluster* new_node = nullptr;
@@ -550,7 +559,7 @@ void sequentialOperator::updateVertexFusion() {
         // sort the pairs.
         _pairs = _graph->get_sequential_pairs();
 
-        if (_pairs.size() < _para->clus_num) {
+        if (_pairs.size() < 1) {
             break;
         }
 
@@ -586,6 +595,11 @@ void sequentialOperator::updateVertexFusion() {
 
             } else if (base_1->get_type() == 3 && base_2->get_type() == 4) {
                 new_node = dynamic_cast<sequentialCluster*>(base_2);
+                // cluster size control.
+                if (new_node->get_subordinate_flipflops().size() > _para->clus_size) {
+                    continue;
+                }
+
                 sequentialFlipFlop* flipflop = dynamic_cast<sequentialFlipFlop*>(base_1);
 
                 // add element to cluster.
@@ -594,6 +608,11 @@ void sequentialOperator::updateVertexFusion() {
                 flipflop->set_cluster(new_node);
             } else if (base_1->get_type() == 4 && base_2->get_type() == 3) {
                 new_node = dynamic_cast<sequentialCluster*>(base_1);
+                // cluster size control.
+                if (new_node->get_subordinate_flipflops().size() > _para->clus_size) {
+                    continue;
+                }
+
                 sequentialFlipFlop* flipflop = dynamic_cast<sequentialFlipFlop*>(base_2);
 
                 // add element to cluster.
@@ -602,13 +621,28 @@ void sequentialOperator::updateVertexFusion() {
                 flipflop->set_cluster(new_node);
             } else if (base_1->get_type() == 4 && base_2->get_type() == 4) {
                 new_node = dynamic_cast<sequentialCluster*>(base_1);
+                // cluster size control.
+                if (new_node->get_subordinate_flipflops().size() > _para->clus_size) {
+                    continue;
+                }
+
                 sequentialCluster* cluster = dynamic_cast<sequentialCluster*>(base_2);
+                // cluster size control.
+                if (cluster->get_subordinate_flipflops().size() > _para->clus_size) {
+                    continue;
+                }
 
                 // add all another cluster's element to cur cluster,and delete front cluster.
                 std::unordered_set<sequentialFlipFlop*>::iterator iter;
                 auto sub_flipflops = cluster->get_subordinate_flipflops();
                 for (iter = sub_flipflops.begin(); iter != sub_flipflops.end(); iter++) {
                     new_node->add_flipflop(*iter);
+                }
+                auto it = _clusters.find(cluster);
+                if (it != _clusters.end()) {
+                    _clusters.erase(it);
+                } else {
+                    _log->warn("Error in found the cluster", 1, 1);
                 }
                 delete cluster;
             } else {
@@ -617,10 +651,21 @@ void sequentialOperator::updateVertexFusion() {
 
             // make vertex fusion.
             _graph->makeVertexFusion(v1, v2, new sequentialVertex(new_node), _para->extra_dist);
+
+            // add to the clusters.
+            _clusters.emplace(new_node);
+
+            end = microtime();
+            _log->printTime("Fusion :" + v1->get_name() + "," + v2->get_name(), end - begin, 2);
         }
-        end = microtime();
-        _log->printTime("Fusion :" + v1->get_name() + "," + v2->get_name(), end - begin, 1);
+        clus_num = _clusters.size();
+        if (clus_num % 10 == 0) {
+            _log->printInt("Cluster", clus_num, 1);
+        }
     }
+    replenishCluster();
+    // print the final cluster num.
+    _log->printInt("Final Cluster", _clusters.size(), 1);
 }
 
 /**
@@ -693,6 +738,16 @@ void sequentialOperator::printGraphInfo() {
 //     }
 //     stack.pop();
 // }
+
+void sequentialOperator::replenishCluster() {
+    for (auto it = _flipflops.begin(); it != _flipflops.end(); it++) {
+        if ((*it)->get_cluster() == nullptr) {
+            sequentialCluster* clus = new sequentialCluster((*it)->get_name());
+            clus->add_flipflop(*it);
+            _clusters.emplace(clus);
+        }
+    }
+}
 
 void sequentialOperator::plot() {
     ofstream dot_seq(_circuit->get_design_name() + ".gds");

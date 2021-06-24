@@ -13,6 +13,7 @@
 #pragma once
 
 #include <algorithm>
+#include <list>
 #include <memory>
 #include <set>
 #include <stack>
@@ -66,12 +67,11 @@ public:
         bool operator()(sequentialVertex* left, sequentialVertex* right) const { return *left < *right; }
     };
 
-
     void add_src_edges(sequentialArc* src_edge) { _src_edges.push_back(src_edge); }
     void add_sink_edges(sequentialArc* sink_edge) { _sink_edges.push_back(sink_edge); }
 
-    void add_ancestors(sequentialVertex* v) { _ancestors.insert(v); }
-    void add_descendants(sequentialVertex* v) { _descendants.insert(v); }
+    void add_ancestors(sequentialVertex* v) { _ancestors.push_back(v); }
+    void add_descendants(sequentialVertex* v) { _descendants.push_back(v); }
 
     void set_start() { _is_start = 1; }
     void set_end() { _is_end = 1; }
@@ -82,11 +82,11 @@ public:
 
     std::string get_name() const { return _name; }
     sequentialBase* get_base() const { return _node; }
-    std::vector<sequentialArc*>& get_src_edges() { return _src_edges; }
-    std::vector<sequentialArc*>& get_sink_edges() { return _sink_edges; }
+    std::vector<sequentialArc*> get_src_edges() { return _src_edges; }
+    std::vector<sequentialArc*> get_sink_edges() { return _sink_edges; }
 
-    std::set<sequentialVertex*, vertexCmp>& get_ancestors() { return _ancestors; }
-    std::set<sequentialVertex*, vertexCmp>& get_descendants() { return _descendants; }
+    std::list<sequentialVertex*> get_ancestors() { return _ancestors; }
+    std::list<sequentialVertex*> get_descendants() { return _descendants; }
 
     unsigned isStart() const { return _is_start; }
     unsigned isEnd() const { return _is_end; }
@@ -100,8 +100,8 @@ private:
     std::vector<sequentialArc*> _src_edges;   // The sequentialArc sourced from the vertex.
     std::vector<sequentialArc*> _sink_edges;  // The sequentialArc sinked to the vertex.
 
-    std::set<sequentialVertex*, vertexCmp> _ancestors;    // Record all ancestors.
-    std::set<sequentialVertex*, vertexCmp> _descendants;  // Record all descendants.
+    std::list<sequentialVertex*> _ancestors;    // Record all ancestors.
+    std::list<sequentialVertex*> _descendants;  // Record all descendants.
 };
 
 class vertexPair {
@@ -221,6 +221,7 @@ public:
     void addVirtualRoot();
 
     void updateArrival(sequentialVertex* v1, sequentialVertex* v2, double distance);
+    void deleteArrival(sequentialVertex* src, sequentialVertex* arrival);
 
     void leastCommonAncestorDFS(sequentialVertex* root, int core_x, int core_y, double max_skew);
 

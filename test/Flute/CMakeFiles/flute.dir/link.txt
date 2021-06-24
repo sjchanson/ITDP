@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -std=c++0x -no-pie -O0 -Wall -g2 -ggdb -D_GLIBCXX_USE_CXX11_ABI=0 -fopenmp  -shared -Wl,-soname,libflute.so -o libflute.so CMakeFiles/flute.dir/flute_new.cpp.o 

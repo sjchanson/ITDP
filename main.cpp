@@ -1,6 +1,7 @@
 #include "evaluate.h"
 #include "include/logger.h"
 #include "include/utility.h"
+#include "sequentialCluster/ctsBase.h"
 #include "sequentialCluster/sequentialOperator.h"
 
 int main(int argc, char** argv) {
@@ -59,10 +60,10 @@ int main(int argc, char** argv) {
     // init the sequential pair.
     _cluster_ff->initSequentialPair();
 
-    
-
     // update vertexes fusion
     _cluster_ff->updateVertexFusion();
+
+    // build the ctsBase.
 
     return 0;
 }

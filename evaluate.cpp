@@ -30,7 +30,7 @@ bool circuit::measure_timing() {
 
     // 2. run UI-Timer
     char *arguments[5];
-    for (int i = 0; i < 5; i++) arguments[i] = new char[80];
+    for (int i = 0; i < 5; i++) arguments[i] = new char[8000];
     strcpy(arguments[0], "ui-timer2.0");
     strcpy(arguments[1], (filename + ".tau2015").c_str());
     strcpy(arguments[2], (filename + ".timing").c_str());

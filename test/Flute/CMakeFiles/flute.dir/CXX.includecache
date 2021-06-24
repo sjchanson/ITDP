@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/root/iTDP0.2/Flute/flute.h
+
+/root/iTDP0.2/Flute/flute_new.cpp
+stdio.h
+-
+stdlib.h
+-
+limits.h
+-
+flute.h
+/root/iTDP0.2/Flute/flute.h
+algorithm
+-
+
