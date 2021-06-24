@@ -1,9 +1,0 @@
-/root/iTDP0.2/test/CMakeFiles/rebuild_cache.dir
-/root/iTDP0.2/test/CMakeFiles/edit_cache.dir
-/root/iTDP0.2/test/CMakeFiles/iTDPlacer.dir
-/root/iTDP0.2/test/Flute/CMakeFiles/rebuild_cache.dir
-/root/iTDP0.2/test/Flute/CMakeFiles/edit_cache.dir
-/root/iTDP0.2/test/Flute/CMakeFiles/flute.dir
-/root/iTDP0.2/test/sequentialCluster/CMakeFiles/rebuild_cache.dir
-/root/iTDP0.2/test/sequentialCluster/CMakeFiles/edit_cache.dir
-/root/iTDP0.2/test/sequentialCluster/CMakeFiles/sequentalCluster.dir
