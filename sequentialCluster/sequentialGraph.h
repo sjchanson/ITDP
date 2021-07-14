@@ -13,6 +13,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <set>
@@ -27,6 +28,8 @@
 class sequentialElement;
 class sequentialVertex;
 class sequentialArc;
+
+struct vertexPtrLess;
 
 class sequentialArc {
 public:
@@ -63,15 +66,25 @@ public:
 
     ~sequentialVertex();
 
-    struct vertexCmp {
-        bool operator()(sequentialVertex* left, sequentialVertex* right) const { return *left < *right; }
-    };
+    bool operator()(sequentialVertex* v) const { return *v == *this; }
 
     void add_src_edges(sequentialArc* src_edge) { _src_edges.push_back(src_edge); }
     void add_sink_edges(sequentialArc* sink_edge) { _sink_edges.push_back(sink_edge); }
 
-    void add_ancestors(sequentialVertex* v) { _ancestors.push_back(v); }
-    void add_descendants(sequentialVertex* v) { _descendants.push_back(v); }
+    void add_batch_ancestors(std::list<sequentialVertex*> batch);
+    void add_batch_descendants(std::list<sequentialVertex*> batch);
+
+    void updateAncestors(std::list<sequentialVertex*> extra_ancestors);
+    void updateDescendants(std::list<sequentialVertex*> extra_descendants);
+
+    void add_ancestor(sequentialVertex* v) { _ancestors.push_back(v); }
+    void add_descendant(sequentialVertex* v) { _descendants.push_back(v); }
+
+    void removeAncestor(sequentialVertex* v);
+    void removeDescendant(sequentialVertex* v);
+
+    void duplicateRemoveAncestors();
+    void duplicateRemoveDescendants();
 
     void set_start() { _is_start = 1; }
     void set_end() { _is_end = 1; }
@@ -87,6 +100,11 @@ public:
 
     std::list<sequentialVertex*> get_ancestors() { return _ancestors; }
     std::list<sequentialVertex*> get_descendants() { return _descendants; }
+
+    std::vector<sequentialVertex*> get_direct_vertexes();
+
+    std::set<sequentialVertex*, vertexPtrLess> get_src_vertexes();
+    std::set<sequentialVertex*, vertexPtrLess> get_sink_vertexes();
 
     unsigned isStart() const { return _is_start; }
     unsigned isEnd() const { return _is_end; }
@@ -125,7 +143,7 @@ public:
     sequentialPair(vertexPair* pair);
     ~sequentialPair() = default;
 
-    bool operator<(const sequentialPair& right) const { return _distance < right.get_distance(); }
+    bool operator<(const sequentialPair& right) const { return _name < right._name; }
 
     bool operator==(const sequentialPair& right) const {
         if (*_vertex_1 == *(right.get_vertex1()) && *_vertex_2 == *(right.get_vertex2())) {
@@ -146,19 +164,39 @@ public:
     bool findAnotherVetex(sequentialVertex* vetex_1, sequentialVertex*& another_vertex);
 
 private:
+    string _name;
     sequentialVertex* _vertex_1;
     sequentialVertex* _vertex_2;
     double _distance;
 };
 
 struct sequentialPairCmp {
-    bool operator()(sequentialPair* left, const sequentialPair* right) const {
-        if (*left == *right) {
-            return false;
+    bool operator()(const sequentialPair* left, const sequentialPair* right) const {
+        if (*left < *right) {
+            return true;
         } else {
-            return *left < *right;
+            return false;
         }
     }
+};
+
+struct sequentialpairCmp2 {
+    bool operator()(sequentialPair* left, const sequentialPair* right) const { return *left < *right; }
+};
+static bool preClusterPairCMP(sequentialPair* pair_1, sequentialPair* pair_2) {
+    return pair_1->get_distance() < pair_2->get_distance();
+};
+
+struct sequentialPairHash {
+    size_t operator()(const sequentialPair* pair) const {
+        size_t hash_1 = std::hash<string>()(pair->get_vertex1()->get_name());
+        size_t hash_2 = std::hash<string>()(pair->get_vertex2()->get_name());
+        return hash_1 ^ hash_2;
+    }
+};
+
+struct sequentialPairEqual {
+    bool operator()(sequentialPair* pair_1, sequentialPair* pair_2) const { return *pair_1 == *pair_2; }
 };
 
 struct vertexPtrHash {
@@ -168,18 +206,32 @@ struct vertexPtrHash {
 struct vertexPtrEqual {
     bool operator()(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) const { return (*v_ptr1) == (*v_ptr2); }
 };
+static bool compareVertexPtrEqual(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) { return (*v_ptr1) == (*v_ptr2); }
 
 struct vertexPtrLess {
     bool operator()(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) const { return (*v_ptr1) < (*v_ptr2); }
 };
+static bool compareVertexPtrLess(sequentialVertex* v_ptr1, sequentialVertex* v_ptr2) { return (*v_ptr1) < (*v_ptr2); }
 
 class sequentialGraph {
 public:
     sequentialGraph();
-    sequentialGraph(Logger* log);
-    // copy constructor
+    sequentialGraph(string name, Logger* log, parameter* para);
     sequentialGraph(const sequentialGraph& obj);
     ~sequentialGraph();
+
+    // pre cluster
+    bool isExtraDistanceConnection(std::string cluster_name, sequentialVertex* class_vertex,
+                                   sequentialVertex* join_vertex, double distance);
+    void initPreCluster();
+    void calPreClusterPair(std::stack<sequentialVertex*>& stack);
+    void preClusterSolve();
+    void completePreCluster(std::string cluster_name);
+    void constructSubGraphs(sequentialGraph* sub_graph, string cluster_name);
+    void DFSSubGraphs(sequentialGraph* graph, std::stack<sequentialVertex*>& stack,
+                      std::set<sequentialVertex*, vertexPtrLess> POs,
+                      std::set<sequentialVertex*, vertexPtrLess> cluster_vertexes,
+                      std::unordered_set<sequentialVertex*, vertexPtrHash, vertexPtrEqual>& visited_vertexes);
 
     void removeVertex(sequentialVertex* vertex);
 
@@ -221,13 +273,13 @@ public:
     void addVirtualRoot();
 
     void updateArrival(sequentialVertex* v1, sequentialVertex* v2, double distance);
-    void deleteArrival(sequentialVertex* src, sequentialVertex* arrival);
+    bool deleteArrival(sequentialVertex* src, sequentialVertex* arrival);
 
     void leastCommonAncestorDFS(sequentialVertex* root, int core_x, int core_y, double max_skew);
 
     double findAncestorByStack(std::stack<sequentialVertex*> stack, sequentialVertex* ancestor);
 
-    void makeVertexFusion(sequentialVertex* vertex_1, sequentialVertex* vertex_2, sequentialVertex* new_vertex,
+    bool makeVertexFusion(sequentialVertex* vertex_1, sequentialVertex* vertex_2, sequentialBase* new_base,
                           double extra_dist);
 
     std::unordered_map<std::string, sequentialVertex*> get_vertexes() const { return _vertexes; }
@@ -242,8 +294,45 @@ public:
     bool isVertexExist(std::string vertex_name);
     sequentialVertex* get_vertex(std::string vertex_name);
 
+    void modifyVertexPairAncestors(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
+                                   sequentialVertex* fusion_vertex);
+    void modifyVertexPairDescendants(sequentialVertex* vertex_1, sequentialVertex* vertex_2,
+                                     sequentialVertex* fusion_vertex);
+
+    void deleteSequentialPair(sequentialVertex* vertex_1, sequentialVertex* vertex_2);
+
+    std::map<sequentialVertex*, std::map<sequentialVertex*, double, vertexPtrLess>, vertexPtrLess> get_arrival() {
+        return _arrivals;
+    }
+
+    bool isSrcInsidePreCluster(sequentialVertex* vertex,
+                               std::unordered_set<sequentialVertex*, vertexPtrHash, vertexPtrEqual> cluster);
+    bool isSinkInsidePreCluster(sequentialVertex* vertex,
+                                std::unordered_set<sequentialVertex*, vertexPtrHash, vertexPtrEqual> cluster);
+
+    // debug
+    void printArrival();
+    void printSequentialPair();
+    void printAncestors();
+    void printDescendants();
+
+    void printArrival(sequentialVertex* vertex);
+    void printSequentialPair(sequentialVertex* vertex);
+
+    // get timing cost
+    double get_modify_arrival_cost() const { return _modify_arrival_cost; }
+    double get_modify_relative_cost() const { return _modify_relative_cost; }
+    double get_modify_topo_cost() const { return _modify_topo_cost; }
+
+    string get_name() const { return _name; }
+
+    // get subGraphes.
+    std::vector<sequentialGraph*> get_sub_graphs() { return _sub_graphs; }
+
 private:
+    string _name;
     Logger* _log;
+    parameter* _para;
     // using unordered_map to store vertexes.
     std::unordered_map<std::string, sequentialVertex*> _vertexes;
     std::set<sequentialArc*> _arcs;
@@ -272,4 +361,18 @@ private:
 
     // for record the path.
     std::stack<sequentialVertex*> _stack;
+
+    // for record the timing
+    double _modify_arrival_cost;
+    double _modify_relative_cost;
+    double _modify_topo_cost;
+
+    // for pre cluster.
+    std::vector<sequentialPair*> _precluster_pair_vec;
+    std::unordered_set<sequentialPair*, sequentialPairHash, sequentialPairEqual> _precluster_pair_set;
+    // std::set<sequentialPair*, sequentialPairCmp> _precluster_pair_set;
+    std::unordered_map<sequentialVertex*, bool, vertexPtrHash, vertexPtrEqual> _pre_clusters_visited;
+    std::unordered_multimap<string, sequentialVertex*> _pre_clusters_multimap;
+    std::unordered_map<sequentialVertex*, string, vertexPtrHash, vertexPtrEqual> _vertex_to_cluster_name;
+    std::vector<sequentialGraph*> _sub_graphs;
 };

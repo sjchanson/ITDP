@@ -9,6 +9,7 @@
  *
  */
 
+#include <queue>
 #include <stack>
 #include <vector>
 
@@ -67,25 +68,35 @@ private:
     T _y;
 };
 
-class ctsVertex {
+class ClusterVertex {
 public:
-    ctsVertex();
-    ctsVertex(DBU x, DBU y);
-    ~ctsVertex() = default;
+    ClusterVertex();
+    explicit ClusterVertex(sequentialFlipFlop *flipflop);
+    explicit ClusterVertex(DBU x, DBU y, string name);
+    ~ClusterVertex() = default;
+
+    bool isLegal();
+    // Getter
+    Point<DBU> *get_point() const { return _point; }
+    string get_name() const { return _name; }
+    int get_level() const { return _level; }
+
+    // Setter
+    void set_point(Point<DBU> *point) { _point = point; }
+    void set_skew(const double skew) { _skew = skew; }
+    void set_name(const string name) { _name = name; }
+    void set_level(const int level) { _level = level; }
 
     void add_src_edges(ctsEdge *e) { _src_edges.push_back(e); }
     void add_sink_edges(ctsEdge *e) { _sink_edges.push_back(e); }
 
     vector<ctsEdge *> get_src_edges() const { return _src_edges; }
     vector<ctsEdge *> get_sink_edges() const { return _sink_edges; }
-    int get_id() const { return _id; }
-
-    void set_skew(double skew) { _skew = skew; }
-    void set_id(int id) { _id = id; }
 
 private:
-    int _id;
-    Point<DBU> _coord;  // location.
+    string _name;
+    int _level;
+    Point<DBU> *_point;  // location.
     vector<ctsEdge *> _src_edges;
     vector<ctsEdge *> _sink_edges;
     double _skew;
@@ -93,45 +104,60 @@ private:
 
 class ctsEdge {
 public:
-    ctsEdge() = delete;
-    ctsEdge(ctsVertex *src, ctsVertex *sink);
+    ctsEdge();
+    ctsEdge(ClusterVertex *src, ClusterVertex *sink);
     ~ctsEdge();
 
-    ctsVertex *get_src() const { return _src; }
-    ctsVertex *get_sink() const { return _sink; }
+    ClusterVertex *get_src() const { return _src; }
+    ClusterVertex *get_sink() const { return _sink; }
 
 private:
-    ctsVertex *_src;
-    ctsVertex *_sink;
+    ClusterVertex *_src;
+    ClusterVertex *_sink;
+};
+
+class ClusterVertexPair {
+public:
+    ClusterVertexPair();
+    ClusterVertexPair(ClusterVertex *v1, ClusterVertex *v2);
+    ~ClusterVertexPair() = default;
+
+    ClusterVertex *vertex_1;
+    ClusterVertex *vertex_2;
+    DBU distance;
 };
 
 class ctsSingleClus {
 public:
     ctsSingleClus();
-    ctsSingleClus(std::unordered_set<sequentialFlipFlop *> flipflops);
+    ctsSingleClus(
+        std::unordered_set<sequentialFlipFlop *, sequentialFlipFlop::basePtrHash, sequentialFlipFlop::basePtrEqual>
+            flipflops);
     ~ctsSingleClus();
 
+    std::vector<ClusterVertex *> get_binary_tree() const { return _binary_tree; }
+
 private:
-    std::vector<ctsVertex *> _binary_tree;
-    std::unordered_set<sequentialFlipFlop *> _origin_flipflops;
+    int _transition_point_cnt;
+    int _top_level;
 
-    std::vector<sequentialFlipFlop *> _binary_flipflops;  // for those which paticipate in binary tree.
+    std::vector<ClusterVertex *> _binary_tree;
+    std::unordered_set<sequentialFlipFlop *, sequentialFlipFlop::basePtrHash, sequentialFlipFlop::basePtrEqual>
+        _origin_flipflops;
+    std::vector<ClusterVertexPair> _binary_pair;
 
-    std::vector<ctsVertex *> _vertexes;  // all Vertices with connection within the cluster.
-    std::vector<ctsEdge *> _edges;       // all Edge connection.
+    std::list<sequentialFlipFlop *> _binary_flipflops;  // for those which paticipate in binary tree.
+    ClusterVertex *_root_vertex;
+    std::vector<ClusterVertex *> _vertexes;  // all Vertices with connection within the cluster.
 
-    std::set<std::pair<ctsVertex *, ctsVertex *> > _pairs;
-
-    // three type of special case.
-    std::vector<ctsVertex *> _special_forks;
-    std::vector<ctsVertex *> _special_merges;
-    std::vector<ctsVertex *> _special_cascades;
+    std::vector<ctsEdge *> _edges;  // all Edge connection.
 
     void init();  // flipflops of a cluster -> binary tree.
-    void splitStructre();
-    void analyStructre();
-    // uncomplete.
-    void analyDFS(std::stack<ctsVertex *> &stack, std::map<int, bool> &is_visited);
+    void analyseSinkRelationship();
+    void constructPerfectBinaryTree();
+    void analyseBFS(std::queue<ClusterVertex *> &queue);
+    ClusterVertex *buildVertexes(sequentialFlipFlop *from, sequentialFlipFlop *to, int transition_cnt);
+    std::list<ClusterVertex *> updateUpLevelVertexes(std::list<ClusterVertex *> cur_vertexes, int level);
 };
 
 class ctsBase {
@@ -140,8 +166,10 @@ public:
     ctsBase(std::unordered_set<sequentialCluster *, baseHash, baseEqual> clusters);
     ~ctsBase();
 
+    std::vector<ctsSingleClus *> get_sub_clusters() const { return _sub_clusters; }
+
 private:
-    std::vector<ctsSingleClus *> _binary_tree;
+    std::vector<ctsSingleClus *> _sub_clusters;
     std::unordered_set<sequentialCluster *, baseHash, baseEqual> _clusters;
 
     void init();  // clusters -> binary tree.

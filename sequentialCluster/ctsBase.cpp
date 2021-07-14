@@ -1,12 +1,44 @@
 #include "ctsBase.h"
 
-ctsVertex::ctsVertex() : _id(-1), _coord(-1, -1), _skew(DBL_MAX) {}
+ClusterVertex::ClusterVertex() : _name(""), _level(INT_MAX), _point(nullptr), _skew(0) {}
 
-ctsVertex::ctsVertex(DBU x, DBU y) : ctsVertex() { _coord = Point<DBU>(_coord.getX(), _coord.getY()); }
+ClusterVertex::ClusterVertex(sequentialFlipFlop *flipflop) : ClusterVertex() {
+    _point = new Point<DBU>(flipflop->get_coord().x, flipflop->get_coord().y);
+    _name = flipflop->get_name();
+}
 
-ctsSingleClus::ctsSingleClus() {}
+ClusterVertex::ClusterVertex(DBU x, DBU y, string name) : ClusterVertex() {
+    _point = new Point<DBU>(x, y);
+    _name = name;
+}
 
-ctsSingleClus::ctsSingleClus(std::unordered_set<sequentialFlipFlop *> flipflops) : ctsSingleClus() {
+ctsEdge::ctsEdge() : _src(nullptr), _sink(nullptr) {}
+
+ctsEdge::ctsEdge(ClusterVertex *src, ClusterVertex *sink) : ctsEdge() {
+    _src = src;
+    _sink = sink;
+}
+
+ctsEdge::~ctsEdge() {
+    _src = nullptr;
+    _sink = nullptr;
+}
+
+ClusterVertexPair::ClusterVertexPair() : vertex_1(nullptr), vertex_2(nullptr), distance(DBL_MAX) {}
+
+ClusterVertexPair::ClusterVertexPair(ClusterVertex *v1, ClusterVertex *v2) : ClusterVertexPair() {
+    vertex_1 = v1;
+    vertex_2 = v2;
+    distance =
+        abs(v1->get_point()->getX() - v2->get_point()->getX()) + abs(v1->get_point()->getY() - v2->get_point()->getY());
+}
+
+ctsSingleClus::ctsSingleClus() : _transition_point_cnt(0), _top_level(0), _root_vertex(nullptr) {}
+
+ctsSingleClus::ctsSingleClus(
+    std::unordered_set<sequentialFlipFlop *, sequentialFlipFlop::basePtrHash, sequentialFlipFlop::basePtrEqual>
+        flipflops)
+    : ctsSingleClus() {
     _origin_flipflops = flipflops;
     init();
 }
@@ -17,101 +49,220 @@ ctsSingleClus::~ctsSingleClus() {
 }
 
 void ctsSingleClus::init() {
-    splitStructre();
-    analyStructre();
+    analyseSinkRelationship();
+    constructPerfectBinaryTree();
 }
 
-void ctsSingleClus::splitStructre() {
+void ctsSingleClus::analyseSinkRelationship() {
     for (auto cur_f : _origin_flipflops) {
         // Judge if the source flipflop is with the class.
-        bool flag = false;  // flag to identfy if current flipflop has connection.
+        bool is_existed = false;
         for (auto src_f : cur_f->get_source()) {
             if (src_f->get_type() != 3) {
                 continue;
             }
             auto it = _origin_flipflops.find(dynamic_cast<sequentialFlipFlop *>(src_f));
             if (it != _origin_flipflops.end()) {
-                flag = true;
-                auto f1 = dynamic_cast<sequentialFlipFlop *>(src_f);
-                auto f2 = dynamic_cast<sequentialFlipFlop *>(cur_f);
-                // add topo.
-                ctsVertex *src_v = new ctsVertex(f1->get_coord().x, f1->get_coord().y);
-                ctsVertex *sink_v = new ctsVertex(f2->get_coord().x, f2->get_coord().y);
-                sink_v->set_skew(f2->get_skew(f1));  // get the skew form f1->f2.
-                ctsEdge *edge = new ctsEdge(src_v, sink_v);
-                src_v->add_sink_edges(edge);
-                sink_v->add_src_edges(edge);
-
-                src_v->set_id(_vertexes.size());  // add id.
-                _vertexes.push_back(src_v);
-                sink_v->set_id(_vertexes.size());  // add id.
-                _vertexes.push_back(sink_v);
-                _edges.push_back(edge);
+                is_existed = true;
+                break;
             }
         }
-        if (flag) {
-            continue;
+        if (is_existed) {
+            _binary_flipflops.push_back(cur_f);
+        } else {
+            cur_f->resetSkew();  // cur vertex has no source in the sub graph.
+            _binary_flipflops.push_back(cur_f);
         }
-        // no connection case.
-        _binary_flipflops.push_back(cur_f);
     }
+
+    // sort _binary_flipflops by skew.
+    _binary_flipflops.sort(
+        [](sequentialFlipFlop *f1, sequentialFlipFlop *f2) { return f1->get_max_skew() > f2->get_max_skew(); });
+
+    std::list<ClusterVertex *> level_up_list;
+    std::list<ClusterVertex *> remain_list;
+    std::list<ClusterVertex *> tmp_list;
+    // pick the bigger skew pair to make vertex, and make the union vertex.
+    while (!_binary_flipflops.empty()) {
+        auto flipflop = *_binary_flipflops.begin();
+        if (flipflop->get_max_skew() == 0.0) {
+            break;
+        }
+        auto src_flipflop = flipflop->get_max_skew_source();  // the src must exist because the max skew exist.
+        auto it = std::find_if(_binary_flipflops.begin(), _binary_flipflops.end(),
+                               [src_flipflop](const sequentialFlipFlop *f) { return *src_flipflop == *f; });
+        if (it != _binary_flipflops.end()) {
+            _binary_flipflops.remove_if([src_flipflop](const sequentialFlipFlop *f) { return *src_flipflop == *f; });
+            // make the vertex.
+            auto up_vertex = buildVertexes(src_flipflop, flipflop, _transition_point_cnt++);
+            level_up_list.push_back(up_vertex);
+        }
+        _binary_flipflops.remove_if([flipflop](const sequentialFlipFlop *f) { return *flipflop == *f; });
+    }
+
+    // remain _binary_flipflops become vertexes.
+    for (auto remain_flipflop : _binary_flipflops) {
+        ClusterVertex *cur_vertex = new ClusterVertex(remain_flipflop);
+
+        remain_list.push_back(cur_vertex);
+    }
+
+    tmp_list = updateUpLevelVertexes(remain_list, 0);
+
+    // level 0
+    for (auto vertex : tmp_list) {
+        level_up_list.push_back(vertex);
+    }
+
+    while (level_up_list.size() != 1) {
+        _top_level++;
+        level_up_list = updateUpLevelVertexes(level_up_list, _top_level);
+    }
+    _root_vertex = *level_up_list.begin();
+    _root_vertex->set_level(++_top_level);
+    _vertexes.push_back(_root_vertex);
 }
 
-void ctsSingleClus::analyStructre() {
-    std::vector<ctsVertex *> start_vertexes;
-    for (auto v : _vertexes) {
-        if (v->get_src_edges().empty()) {
-            start_vertexes.push_back(v);
-        }
-    }
-    std::stack<ctsVertex *> stack;
-    std::map<int, bool> is_visited;
-    for (auto src_v : start_vertexes) {
-        auto e_vec = src_v->get_sink_edges();
-        if (e_vec.size() == 1) {  // common connect case.
-            auto sink_v = e_vec[0]->get_sink();
-            if (sink_v->get_sink_edges().empty()) {
-                std::pair<ctsVertex *, ctsVertex *> cur_pair(src_v, sink_v);
-                _pairs.emplace(cur_pair);
-            } else {  // cascade case.
-                _special_cascades.push_back(src_v);
+ClusterVertex *ctsSingleClus::buildVertexes(sequentialFlipFlop *from, sequentialFlipFlop *to, int transition_cnt) {
+    string transition_name = "transition_" + std::to_string(transition_cnt);
 
-                // DFS for make visited flag.
-                stack.push(src_v);
-                analyDFS(stack, is_visited);
-            }
-        } else {  // fork case.
-            _special_forks.push_back(src_v);
+    ClusterVertex *src_vertex = new ClusterVertex(from);
+    src_vertex->set_level(0);  // set level.
+    // src_vertex->set_skew();  // src skew should add as it is sink.
+    ClusterVertex *sink_vertex = new ClusterVertex(to);
+    sink_vertex->set_level(0);
+    sink_vertex->set_skew(to->get_skew(from));
+    _vertexes.push_back(src_vertex);
+    _vertexes.push_back(sink_vertex);
 
-            // DFS for make visited flag.
-            stack.push(src_v);
-            analyDFS(stack, is_visited);
-        }
-    }
+    // add transition vertex.
+    DBU x_coord = (from->get_coord().x + to->get_coord().x) / 2;
+    DBU y_coord = (from->get_coord().y + to->get_coord().y) / 2;
+    ClusterVertex *transition_vertex = new ClusterVertex(x_coord, y_coord, transition_name);
+
+    // make graph.
+    ctsEdge *edge_1 = new ctsEdge(transition_vertex, src_vertex);
+    ctsEdge *edge_2 = new ctsEdge(transition_vertex, sink_vertex);
+    transition_vertex->add_sink_edges(edge_1);
+    transition_vertex->add_sink_edges(edge_2);
+    src_vertex->add_src_edges(edge_1);
+    sink_vertex->add_src_edges(edge_2);
+
+    _edges.push_back(edge_1);
+    _edges.push_back(edge_2);
+
+    return transition_vertex;
 }
 
-void ctsSingleClus::analyDFS(std::stack<ctsVertex *> &stack, std::map<int, bool> &is_visited) {
-    auto cur_v = stack.top();
+std::list<ClusterVertex *> ctsSingleClus::updateUpLevelVertexes(std::list<ClusterVertex *> cur_vertexes, int level) {
+    std::list<ClusterVertex *> up_vertex_list;
 
-    if (is_visited[cur_v->get_id()]) {  // merge case.
-        _special_merges.push_back(cur_v);
-        stack.pop();
-        return;
+    for (auto iter = cur_vertexes.begin(); iter != cur_vertexes.end(); ++iter) {
+        ClusterVertex *vertex_i = *iter;
+        auto tmp_iter = iter;
+        for (auto iter_back = ++tmp_iter; iter_back != cur_vertexes.end(); iter_back++) {
+            ClusterVertex *vertex_j = *iter_back;
+            ClusterVertexPair pair(vertex_i, vertex_j);
+            _binary_pair.push_back(pair);
+        }
     }
 
-    is_visited[cur_v->get_id()] = true;
+    // sort the _binary_pair according to the distance.
+    std::sort(_binary_pair.begin(), _binary_pair.end(),
+              [](const ClusterVertexPair &p1, const ClusterVertexPair &p2) { return p1.distance < p2.distance; });
 
-    if (cur_v->get_sink_edges().empty()) {
-        stack.pop();
-        return;
+    for (auto pair : _binary_pair) {
+        auto v1 = pair.vertex_1;
+        auto v2 = pair.vertex_2;
+        auto it_1 = std::find_if(cur_vertexes.begin(), cur_vertexes.end(),
+                                 [v1](ClusterVertex *v) { return v1->get_name() == v->get_name(); });
+        auto it_2 = std::find_if(cur_vertexes.begin(), cur_vertexes.end(),
+                                 [v2](ClusterVertex *v) { return v2->get_name() == v->get_name(); });
+        if (it_1 != cur_vertexes.end() && it_2 != cur_vertexes.end()) {
+            string transition_name = "transition_" + std::to_string(_transition_point_cnt++);
+            v1->set_level(level);  // set level.
+            _vertexes.push_back(v1);
+            v2->set_level(level);  // set level.
+            _vertexes.push_back(v2);
+
+            // add transition vertex.
+            DBU x_coord = (v1->get_point()->getX() + v2->get_point()->getX()) / 2;
+            DBU y_coord = (v1->get_point()->getY() + v2->get_point()->getY()) / 2;
+            ClusterVertex *transition_vertex = new ClusterVertex(x_coord, y_coord, transition_name);
+
+            // make graph.
+            ctsEdge *edge_1 = new ctsEdge(transition_vertex, v1);
+            ctsEdge *edge_2 = new ctsEdge(transition_vertex, v2);
+            transition_vertex->add_sink_edges(edge_1);
+            transition_vertex->add_sink_edges(edge_2);
+            v1->add_src_edges(edge_1);
+            v2->add_src_edges(edge_2);
+
+            _edges.push_back(edge_1);
+            _edges.push_back(edge_2);
+
+            // add to the up_vertex_list.
+            up_vertex_list.push_back(transition_vertex);
+
+            // delete the v1, v2.
+            cur_vertexes.erase(it_1);
+            cur_vertexes.erase(it_2);
+        }
+    }
+    // there must be one vertex left or no vertex left.
+    if (!cur_vertexes.empty()) {
+        if (cur_vertexes.size() == 1) {
+            auto remain_vertex = *(cur_vertexes.begin());
+            up_vertex_list.push_back(remain_vertex);
+        } else {
+            std::cout << "ERROR In updateUpLevelVertexes." << std::endl;
+        }
     }
 
-    auto e_vec = cur_v->get_sink_edges();
-    for (auto e : e_vec) {
-        stack.push(e->get_sink());
-        analyDFS(stack, is_visited);
+    return up_vertex_list;
+}
+
+void ctsSingleClus::constructPerfectBinaryTree() {
+    // Complete perfect binary tree.
+    for (auto vertex : _vertexes) {
+        if (vertex->get_level() == 1 && vertex->get_sink_edges().empty()) {
+            string prefix = "transition_";
+            ClusterVertex *t_1 = new ClusterVertex(-1, -1, prefix + std::to_string(_transition_point_cnt++));
+            ClusterVertex *t_2 = new ClusterVertex(-1, -1, prefix + std::to_string(_transition_point_cnt++));
+
+            ctsEdge *edge_1 = new ctsEdge(vertex, t_1);
+            ctsEdge *edge_2 = new ctsEdge(vertex, t_2);
+
+            vertex->add_sink_edges(edge_1);
+            vertex->add_sink_edges(edge_2);
+            t_1->add_src_edges(edge_1);
+            t_2->add_src_edges(edge_2);
+
+            _vertexes.push_back(t_1);
+            _vertexes.push_back(t_2);
+            _edges.push_back(edge_1);
+            _edges.push_back(edge_2);
+        }
     }
-    stack.pop();
+
+    // Construct the prefect binary tree.
+    std::queue<ClusterVertex *> queue;
+    queue.push(_root_vertex);
+    analyseBFS(queue);
+}
+
+void ctsSingleClus::analyseBFS(std::queue<ClusterVertex *> &queue) {
+    while (!queue.empty()) {
+        auto cur_v = queue.front();
+        _binary_tree.push_back(cur_v);
+        queue.pop();
+
+        auto e_vec = cur_v->get_sink_edges();
+        for (auto e : e_vec) {
+            auto next_v = e->get_sink();
+            queue.push(next_v);
+        }
+    }
 }
 
 ctsBase::ctsBase(std::unordered_set<sequentialCluster *, baseHash, baseEqual> clusters) {
@@ -120,12 +271,14 @@ ctsBase::ctsBase(std::unordered_set<sequentialCluster *, baseHash, baseEqual> cl
 }
 
 ctsBase::~ctsBase() {
-    _binary_tree.clear();
+    _sub_clusters.clear();
     _clusters.clear();
 }
 
 void ctsBase::init() {
     for (auto clus : _clusters) {
-        auto flipflops = clus->get_subordinate_flipflops();
+        auto sub_flipflops = clus->get_subordinate_flipflops();
+        ctsSingleClus *sub_cluster = new ctsSingleClus(sub_flipflops);
+        _sub_clusters.push_back(sub_cluster);
     }
 }

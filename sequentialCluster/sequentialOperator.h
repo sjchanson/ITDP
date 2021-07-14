@@ -42,11 +42,18 @@ class sequentialOperator {
 public:
     sequentialOperator();
     sequentialOperator(parameter* para, circuit* circuit, Logger* log);
+    sequentialOperator(parameter* para, circuit* circuit, Logger* log, sequentialGraph* graph);
     ~sequentialOperator();
+
+    // generate the flipflops according to vertex.
+    void traverseFlipflop();
 
     void pinIdToSinkPins(unsigned pin_idx, vector<pin*>& pins);
     vector<unsigned> cellToPinIds(cell* cell);
     uint stringToId(map<string, unsigned> port_map, string port_name);
+
+    void initSubGraphs();
+    void updatePreClusteres();
 
     void initSequentialPair();
 
@@ -57,7 +64,13 @@ public:
 
     void replenishCluster();
 
-    void plot();
+    void plotInitGraph(std::string name);
+    void plotIncrementalGraph(string name, int iter, int interval);
+    void plotCurGraph(std::string name);
+
+    void printArrival();
+    void printSequentialPair();
+    std::unordered_set<sequentialCluster*, baseHash, baseEqual> get_clusters() const { return _clusters; }
 
 private:
     parameter* _para;
@@ -87,6 +100,16 @@ private:
 
     // pair store
     std::set<sequentialPair*, sequentialPairCmp> _pairs;
+
+    // for record timing.
+    double _sort_set_cost;
+    double _find_ring_cost;
+    double _fusion_total_cost;
+    double _fusion_tmp_cost;
+    double _modify_arrival_cost;
+
+    // sub operators store.
+    std::vector<sequentialOperator*> _sequential_opt_vec;
 
     void init();
 

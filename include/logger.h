@@ -31,6 +31,7 @@ public:
     void printPair(std::string input, int x, int y, int verbose);
 
     void printInt(std::string input, int num, int verbose);
+    void printDouble(std::string input, double num, int verbose);
     void printString(std::string input, std::string context, int verbose);
 
     void printItself(std::string context, int verbose);

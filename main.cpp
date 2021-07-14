@@ -25,16 +25,14 @@ int main(int argc, char** argv) {
 
     // Read File Run Time End
     end = microtime();
-    _log->printTime("Read File", end - begin, 1);
+    _log->printTime("[main] Read File", end - begin, 1);
 
     // Evaluate Timing Run Time Begin
     begin = microtime();
-
     _circuit->measure_timing();
-
     // Evaluate Timing Run Time End
     end = microtime();
-    _log->printTime("Evaluate Timing", end - begin, 1);
+    _log->printTime("[main] Evaluate Timing", end - begin, 1);
 
     // parameter control
     parameter* para = new parameter();
@@ -43,7 +41,7 @@ int main(int argc, char** argv) {
     begin = microtime();
     sequentialOperator* _cluster_ff = new sequentialOperator(para, _circuit, _log);
     end = microtime();
-    _log->printTime("Init Flipflop topo", end - begin, 1);
+    _log->printTime("[main] Init Flipflop Complete Topological Relations", end - begin, 1);
 
     // Check if the graph has a ring
     // begin = microtime();
@@ -51,19 +49,46 @@ int main(int argc, char** argv) {
     // end = microtime();
     // _log->printTime("Test timing", end - begin, 1);
 
-    // Plot SequentialElement
+    // Plot Init Graph.
     begin = microtime();
-    _cluster_ff->plot();
+    _cluster_ff->plotInitGraph("origin");
     end = microtime();
-    _log->printTime("Plot", end - begin, 1);
 
-    // init the sequential pair.
-    _cluster_ff->initSequentialPair();
+    // init the sub graph.
+    begin = microtime();
+    _cluster_ff->initSubGraphs();
+    end = microtime();
+    _log->printTime("[main] Init The subGraphs", end - begin, 1);
 
-    // update vertexes fusion
-    _cluster_ff->updateVertexFusion();
+    // cluster the subGraph.
+    begin = microtime();
+    _cluster_ff->updatePreClusteres();
+    end = microtime();
+    _log->printTime("[main] Update preClusteres", end - begin, 1);
+
+    // // init the sequential pair.
+    // begin = microtime();
+    // _cluster_ff->initSequentialPair();
+    // end = microtime();
+    // _log->printTime("[main] Init SequentianPair", end - begin, 1);
+
+    // // update vertexes fusion
+    // begin = microtime();
+    // _cluster_ff->updateVertexFusion();
+    // end = microtime();
+    // _log->printTime("[main] Update Vertexes Fusion", end - begin, 1);
+
+    begin = microtime();
+    _cluster_ff->plotCurGraph("Final");
+    end = microtime();
+    _log->printTime("[main] Plot The Final Graph", end - begin, 1);
 
     // build the ctsBase.
+    begin = microtime();
+    ctsBase* base = new ctsBase(_cluster_ff->get_clusters());
+    end = microtime();
+    _log->printTime("[main] Build The Perfect Binary Tree", end - begin, 1);
+
 
     return 0;
 }

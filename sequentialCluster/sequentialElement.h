@@ -42,9 +42,11 @@ public:
     double get_max_skew();
     coordinate get_coord() const { return _coord; }
 
+    void set_name(string name) { _name = name; }
     void set_id(uint idx) { _id = idx; }
     void set_coord(coordinate coord) { _coord = coord; }
     void add_skew(sequentialBase* base, double skew) { _skews[base] = skew; }
+    void resetSkew();
 
     std::vector<sequentialBase*> get_source();
 
@@ -106,6 +108,8 @@ public:
     cell* get_flipflop() const { return _flipflop; }
     pin* get_input_pin() const { return _input_pin; }
 
+    sequentialFlipFlop* get_max_skew_source();
+
     void set_ff_pi() { _is_ff_pi = 1; }
     void set_ff_po() { _is_ff_po = 1; }
     void set_cluster(sequentialCluster* clus) { _belong_cluster = clus; }
@@ -146,8 +150,10 @@ public:
     void update();
 
     void add_flipflop(sequentialFlipFlop* ff);
-    std::unordered_set<sequentialFlipFlop*> get_subordinate_flipflops() const { return _subordinate_flipflops; }
+    std::unordered_set<sequentialFlipFlop*, basePtrHash, basePtrEqual> get_subordinate_flipflops() const {
+        return _subordinate_flipflops;
+    }
 
 private:
-    std::unordered_set<sequentialFlipFlop*> _subordinate_flipflops;
+    std::unordered_set<sequentialFlipFlop*, basePtrHash, basePtrEqual> _subordinate_flipflops;
 };

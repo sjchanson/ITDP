@@ -26,6 +26,12 @@ double sequentialBase::get_max_skew() {
     return max_skew;
 }
 
+void sequentialBase::resetSkew() {
+    for (auto& base : _skews) {
+        base.second = 0.0;
+    }
+}
+
 vector<sequentialBase*> sequentialBase::get_source() {
     vector<sequentialBase*> sources;
     for (auto it = _skews.begin(); it != _skews.end(); it++) {
@@ -115,6 +121,16 @@ void sequentialFlipFlop::update() {
     // TODO.
 }
 
+sequentialFlipFlop* sequentialFlipFlop::get_max_skew_source() {
+    double max_skew = this->get_max_skew();
+    for (auto f : _skews) {
+        if (f.second == max_skew) {
+            return dynamic_cast<sequentialFlipFlop*>(f.first);
+        }
+    }
+    return nullptr;
+}
+
 sequentialCluster::sequentialCluster(std::string name) {
     _type = 4;
     _name = name;
@@ -133,8 +149,7 @@ void sequentialCluster::add_flipflop(sequentialFlipFlop* ff) {
 void sequentialCluster::update() {
     int x = 0;
     int y = 0;
-    std::unordered_set<sequentialFlipFlop*>::iterator iter;
-    for (iter = _subordinate_flipflops.begin(); iter != _subordinate_flipflops.end(); iter++) {
+    for (auto iter = _subordinate_flipflops.begin(); iter != _subordinate_flipflops.end(); iter++) {
         // get center coordate.
         x += (*iter)->get_coord().x;
         y += (*iter)->get_coord().y;

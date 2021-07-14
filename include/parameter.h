@@ -18,7 +18,23 @@ public:
     double extra_dist;  // for the extra_dist
     int clus_num;
     int clus_size;
+    int plot_interval;
+    int pre_clus_size;
+    int lamda;
 
     parameter();
     void reset() {}
+
+    void set_core_x(int x) { _core_x = x; }
+    void set_core_y(int y) { _core_y = y; }
+    void set_max_required_skew(double skew) { _max_required_skew = skew; }
+
+    int get_core_x() const { return _core_x; }
+    int get_core_y() const { return _core_y; }
+    double get_max_required_skew() const { return _max_required_skew; }
+
+private:
+    int _core_x;
+    int _core_y;
+    double _max_required_skew;
 };

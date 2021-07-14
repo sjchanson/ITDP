@@ -4,6 +4,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "omp.h"
+
 arrivalDistance::arrivalDistance(sequentialBase* base, double dist) {
     arrival_base = base;
     distance = dist;
@@ -16,7 +18,12 @@ sequentialOperator::sequentialOperator()
     , _circuit(nullptr)
     , _core_x(0.0)
     , _core_y(0.0)
-    , _max_required_skew(0.0) {}
+    , _max_required_skew(0.0)
+    , _sort_set_cost(0.0)
+    , _find_ring_cost(0.0)
+    , _fusion_total_cost(0.0)
+    , _fusion_tmp_cost(0.0)
+    , _modify_arrival_cost(0.0) {}
 
 sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger* log) : sequentialOperator() {
     _para = para;
@@ -24,7 +31,9 @@ sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger
     _log = log;
 
     _core_x = _circuit->get_rx() - _circuit->get_lx();
+    _para->set_core_x(_core_x);
     _core_y = _circuit->get_ty() - _circuit->get_by();
+    _para->set_core_y(_core_y);
 
     // get cells pointer.
     for (auto& cell : _circuit->getCells()) {
@@ -55,10 +64,20 @@ sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger
     init();
 }
 
+sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger* log, sequentialGraph* graph)
+    : sequentialOperator() {
+    _para = para;
+    _circuit = circuit;
+    _log = log;
+    _graph = graph;
+}
+
 sequentialOperator::~sequentialOperator() {
     _log = nullptr;
-    _graph = nullptr;
     _circuit = nullptr;
+
+    delete _graph;
+    _graph = nullptr;
 
     for (auto& cell : _cell_vec) {
         cell = nullptr;
@@ -79,10 +98,27 @@ sequentialOperator::~sequentialOperator() {
     for (auto& flipflop : _flipflop_vec) {
         flipflop = nullptr;
     }
+
+    // must manage the sequentialBase.
+    //
+
+    for (auto opt : _sequential_opt_vec) {
+        delete opt;
+    }
+    _sequential_opt_vec.clear();
+}
+
+void sequentialOperator::traverseFlipflop() {
+    for (auto pair : _graph->get_vertexes()) {
+        auto vertex = pair.second;
+        // there must be flipflop case.
+        auto sequentialFlipflop = dynamic_cast<sequentialFlipFlop*>(vertex->get_base());
+        _flipflops.emplace(sequentialFlipflop);
+    }
 }
 
 void sequentialOperator::init() {
-    _graph = new sequentialGraph(_log);
+    _graph = new sequentialGraph("origin", _log, _para);
 
     vector<pin*> pi_vec;
     vector<pin*> po_vec;
@@ -99,9 +135,9 @@ void sequentialOperator::init() {
             po_vec.push_back(cur_pin);
         }
     }
-    _log->printInt("PI Count", pi_vec.size(), 1);
-    _log->printInt("PO Count", po_vec.size(), 1);
-    _log->printInt("FlipFlop Count", _flipflop_vec.size(), 1);
+    _log->printInt("[main-init] PI Count", pi_vec.size(), 1);
+    _log->printInt("[main-init] PO Count", po_vec.size(), 1);
+    _log->printInt("[main-init] FlipFlop Count", _flipflop_vec.size(), 1);
 
     // special case in ICCAD2015 benchmark
     // some filpflops have no output pin.
@@ -114,7 +150,7 @@ void sequentialOperator::init() {
             }
         }
     }
-    _log->printInt("Lack of 'q port' Flipflop", lack_q_cnt, 1);
+    _log->printInt("[main-init] Lack of 'q port' Flipflop", lack_q_cnt, 1);
 
     double begin, end;
     begin = microtime();
@@ -149,12 +185,10 @@ void sequentialOperator::init() {
         ergodicGenerateGraph(seq_stack);  // from the FlipFlop, traverse all paths to POs.
     }
     end = microtime();
-    _log->printTime("Init the sequential graph", end - begin, 1);
     printGraphInfo();
 
+    _log->printTime("[main-init] Init The Sequential Graph", end - begin, 1);
     makeNormalization();
-
-    _graph->initHop();
 }
 
 /**
@@ -395,6 +429,69 @@ sequentialVertex* sequentialOperator::makeVertex(sequentialBase* seq, bool& flag
     }
 }
 
+void sequentialOperator::initSubGraphs() {
+    double begin, end;
+    begin = microtime();
+    _graph->initPreCluster();
+    end = microtime();
+    _log->printTime("[main-initSubGraphs] Init The preCluster Cost", end - begin, 1);
+
+    begin = microtime();
+    _graph->preClusterSolve();
+    end = microtime();
+    _log->printTime("[main-initSubGraphs] preCluster To subGraphs Cost", end - begin, 1);
+}
+
+/**
+ * @brief According to all sub graph, run distance cluster,and write to the _clusters.
+ *
+ */
+void sequentialOperator::updatePreClusteres() {
+    auto graphs_vec = _graph->get_sub_graphs();
+    omp_set_num_threads(16);
+
+    for (int i = 0; i < graphs_vec.size(); i++) {
+        auto sub_graph = graphs_vec[i];
+        sequentialOperator* opt = new sequentialOperator(_para, _circuit, _log, sub_graph);
+        _sequential_opt_vec.push_back(opt);
+    }
+
+#pragma omp parallel for
+    for (int i = 0; i < _sequential_opt_vec.size(); i++) {
+        auto opt = _sequential_opt_vec[i];
+        opt->traverseFlipflop();
+        // _log->printItself("", 1);
+        // _log->printItself("############### Update SubCluster " + std::to_string(i) + " ###############", 1);
+        // opt->plotInitGraph(std::to_string(i));
+        opt->initSequentialPair();
+        opt->updateVertexFusion();
+        if (opt->get_clusters().size() > 2) {
+            opt->plotCurGraph("subCluster_" + std::to_string(i) + "_Final");
+        }
+    }
+
+    // extract all the cluster.
+    int single_cnt = 0;
+    int couple_cnt = 0;
+    int total_clus_cnt = 0;
+    for (auto opt : _sequential_opt_vec) {
+        for (auto clus : opt->get_clusters()) {
+            if (clus->get_subordinate_flipflops().size() == 1) {
+                single_cnt++;
+            }
+            if (clus->get_subordinate_flipflops().size() == 2) {
+                couple_cnt++;
+            }
+            total_clus_cnt++;
+            _clusters.emplace(clus);
+        }
+    }
+
+    _log->printInt("[main-updatePreClusters] Total Cluster", total_clus_cnt, 1);
+    _log->printInt("[main-updatePreClusters] Total Merge Sigle Cluster", single_cnt, 1);
+    _log->printInt("[main-updatePreClusters] Total Merge Couple Cluster", couple_cnt, 1);
+}
+
 /**
  * @brief Given a sink sequential element, Find its forward src sequential element. And make Graph.
  *
@@ -541,8 +638,14 @@ void sequentialOperator::modifyVisitedFFMap(std::string key, bool value) {
  *
  */
 void sequentialOperator::initSequentialPair() {
+    double begin, end;
+    begin = microtime();
+    _graph->initHop();
+    end = microtime();
+    _log->printTime("[main-initSequentialPair] Init Hop", end - begin, 2);
     _graph->updateCoordMapping();
-    _graph->initSeqentialPair(_para->side_length, _core_x, _core_y, _max_required_skew);
+    _graph->initSeqentialPair(_para->side_length, _para->get_core_x(), _para->get_core_y(),
+                              _para->get_max_required_skew());
 }
 
 /**
@@ -550,10 +653,18 @@ void sequentialOperator::initSequentialPair() {
  *
  */
 void sequentialOperator::updateVertexFusion() {
-    int clus_num;
+    double begin, end;
+    int clus_num = 0;
+    int cycle_num = 0;
+    int loop_cnt = 0;
+    int cluster_times = 0;
     while (clus_num < _para->clus_num) {
-        double begin, end;
-        begin = microtime();
+        // _graph->printArrival();         // debug
+        // _graph->printSequentialPair();  // debug
+        // _graph->printAncestors();   // debug
+        // _graph->printDescendants(); //debug
+        double clus_begin, clus_end;
+        clus_begin = microtime();
         sequentialCluster* new_node = nullptr;
 
         // sort the pairs.
@@ -564,22 +675,41 @@ void sequentialOperator::updateVertexFusion() {
         }
 
         // get the first pair
-        std::set<sequentialPair*, sequentialPairCmp>::iterator sort_iter = _pairs.begin();
+        begin = microtime();
+        std::set<sequentialPair*, sequentialpairCmp2> sort_sequential_pair;
+        std::copy(_pairs.begin(), _pairs.end(), inserter(sort_sequential_pair, sort_sequential_pair.begin()));
+        end = microtime();
+        _sort_set_cost = _sort_set_cost + (end - begin);
+
+        std::set<sequentialPair*, sequentialPairCmp>::iterator sort_iter = sort_sequential_pair.begin();
         sequentialVertex* v1 = (*sort_iter)->get_vertex1();
         sequentialVertex* v2 = (*sort_iter)->get_vertex2();
         double distance = (*sort_iter)->get_distance();
 
         // identify the ring.
-        if (_graph->findRing(v1, v2)) {
+        begin = microtime();
+        bool is_ring = _graph->findRing(v1, v2);
+        end = microtime();
+        _find_ring_cost = _find_ring_cost + (end - begin);
+
+        if (is_ring) {
+            loop_cnt++;
             // update the arrival metrix.
+            begin = microtime();
+            _graph->deleteArrival(v1, v2);
+            _graph->deleteArrival(v2, v1);
+            _graph->deleteSequentialPair(v1, v2);
+            end = microtime();
+            _modify_arrival_cost = _modify_arrival_cost + (end - begin);
         } else {
+            cluster_times++;
             // update the sequential base.
             sequentialBase* base_1 = v1->get_base();
             sequentialBase* base_2 = v2->get_base();
 
             // make sure here is filpflop or cluster.
             if (base_1->get_type() == 3 && base_2->get_type() == 3) {
-                new_node = new sequentialCluster("cluster_" + base_1->get_name());
+                new_node = new sequentialCluster("z_" + base_1->get_name());
                 // new_node->set_id(_seq_cluster_vec.size());
 
                 sequentialFlipFlop* element_1 = dynamic_cast<sequentialFlipFlop*>(base_1);
@@ -596,9 +726,27 @@ void sequentialOperator::updateVertexFusion() {
             } else if (base_1->get_type() == 3 && base_2->get_type() == 4) {
                 new_node = dynamic_cast<sequentialCluster*>(base_2);
                 // cluster size control.
-                if (new_node->get_subordinate_flipflops().size() > _para->clus_size) {
+                if (new_node->get_subordinate_flipflops().size() == _para->clus_size) {
+                    // delete the arrival and ancestor.
+                    sequentialVertex tmp_v1(base_1);
+                    sequentialVertex tmp_v2(base_2);
+                    begin = microtime();
+                    _graph->deleteArrival(&tmp_v1, &tmp_v2);
+                    _graph->deleteArrival(&tmp_v2, &tmp_v1);
+                    _graph->deleteSequentialPair(&tmp_v1, &tmp_v2);
+                    end = microtime();
+                    _modify_arrival_cost = _modify_arrival_cost + (end - begin);
+
                     continue;
                 }
+
+                // delete the cluster.
+                auto clus = _clusters.find(new_node);
+                if (clus != _clusters.end()) {
+                    _clusters.erase(clus);
+                }
+
+                new_node->set_name(new_node->get_name() + "+");
 
                 sequentialFlipFlop* flipflop = dynamic_cast<sequentialFlipFlop*>(base_1);
 
@@ -609,9 +757,25 @@ void sequentialOperator::updateVertexFusion() {
             } else if (base_1->get_type() == 4 && base_2->get_type() == 3) {
                 new_node = dynamic_cast<sequentialCluster*>(base_1);
                 // cluster size control.
-                if (new_node->get_subordinate_flipflops().size() > _para->clus_size) {
+                if (new_node->get_subordinate_flipflops().size() == _para->clus_size) {
+                    // delete the arrival and ancestor.
+                    sequentialVertex tmp_v1(base_1);
+                    sequentialVertex tmp_v2(base_2);
+                    begin = microtime();
+                    _graph->deleteArrival(&tmp_v1, &tmp_v2);
+                    _graph->deleteArrival(&tmp_v2, &tmp_v1);
+                    _graph->deleteSequentialPair(&tmp_v1, &tmp_v2);
+                    end = microtime();
+                    _modify_arrival_cost = _modify_arrival_cost + (end - begin);
                     continue;
                 }
+
+                // delete the cluster.
+                auto clus = _clusters.find(new_node);
+                if (clus != _clusters.end()) {
+                    _clusters.erase(clus);
+                }
+                new_node->set_name(new_node->get_name() + "+");
 
                 sequentialFlipFlop* flipflop = dynamic_cast<sequentialFlipFlop*>(base_2);
 
@@ -621,51 +785,104 @@ void sequentialOperator::updateVertexFusion() {
                 flipflop->set_cluster(new_node);
             } else if (base_1->get_type() == 4 && base_2->get_type() == 4) {
                 new_node = dynamic_cast<sequentialCluster*>(base_1);
-                // cluster size control.
-                if (new_node->get_subordinate_flipflops().size() > _para->clus_size) {
-                    continue;
-                }
+                sequentialCluster* cluster_2 = dynamic_cast<sequentialCluster*>(base_2);
 
-                sequentialCluster* cluster = dynamic_cast<sequentialCluster*>(base_2);
-                // cluster size control.
-                if (cluster->get_subordinate_flipflops().size() > _para->clus_size) {
+                int size1, size2;
+                size1 = new_node->get_subordinate_flipflops().size();
+                size2 = cluster_2->get_subordinate_flipflops().size();
+                if (size1 + size2 > _para->clus_size) {
+                    // delete the arrival and ancestor.
+                    sequentialVertex tmp_v1(base_1);
+                    sequentialVertex tmp_v2(base_2);
+                    begin = microtime();
+                    _graph->deleteArrival(&tmp_v1, &tmp_v2);
+                    _graph->deleteArrival(&tmp_v2, &tmp_v1);
+                    _graph->deleteSequentialPair(&tmp_v1, &tmp_v2);
+                    end = microtime();
+                    _modify_arrival_cost = _modify_arrival_cost + (end - begin);
                     continue;
                 }
 
                 // add all another cluster's element to cur cluster,and delete front cluster.
-                std::unordered_set<sequentialFlipFlop*>::iterator iter;
-                auto sub_flipflops = cluster->get_subordinate_flipflops();
-                for (iter = sub_flipflops.begin(); iter != sub_flipflops.end(); iter++) {
+                auto sub_flipflops = cluster_2->get_subordinate_flipflops();
+                for (auto iter = sub_flipflops.begin(); iter != sub_flipflops.end(); iter++) {
                     new_node->add_flipflop(*iter);
                 }
-                auto it = _clusters.find(cluster);
+                auto it = _clusters.find(cluster_2);
                 if (it != _clusters.end()) {
-                    _clusters.erase(it);
+                    auto it1 = _clusters.erase(it);
                 } else {
                     _log->warn("Error in found the cluster", 1, 1);
                 }
-                delete cluster;
+                delete cluster_2;
+                cluster_2 = nullptr;
+
+                // delete the cluster_1.
+                auto clus = _clusters.find(new_node);
+                if (clus != _clusters.end()) {
+                    _clusters.erase(clus);
+                }
+                new_node->set_name(new_node->get_name() + "+");
+
             } else {
                 _log->error("ERROR in update seqential element.", 1, 1);
             }
 
             // make vertex fusion.
-            _graph->makeVertexFusion(v1, v2, new sequentialVertex(new_node), _para->extra_dist);
+            bool succeed_flag = _graph->makeVertexFusion(v1, v2, new_node, _para->extra_dist);
 
+            if (!succeed_flag) {
+                continue;
+            }
             // add to the clusters.
             _clusters.emplace(new_node);
 
-            end = microtime();
-            _log->printTime("Fusion :" + v1->get_name() + "," + v2->get_name(), end - begin, 2);
+            clus_end = microtime();
+            _fusion_total_cost += (clus_end - clus_begin);
         }
         clus_num = _clusters.size();
-        if (clus_num % 10 == 0) {
-            _log->printInt("Cluster", clus_num, 1);
+        cycle_num++;
+        if (cycle_num % _para->plot_interval == 0) {
+            _fusion_tmp_cost = _fusion_total_cost - _fusion_tmp_cost;
+            // print info
+            // cout << endl;
+            _log->printInt("[main-updateVertexFusion] Current iterations", cycle_num, 2);
+            _log->printTime("[main-updateVertexFusion] The Last 100 iterations Cost", _fusion_tmp_cost, 2);
+            _log->printInt("[main-updateVertexFusion] Current Cluster Count", clus_num, 2);
+            _log->printInt("[main-updateVertexFusion] Looping Times", loop_cnt, 2);
+            _log->printTime("[main-updateVertexFusion] Find Ring Cost", _find_ring_cost, 2);
+            _log->printInt("[main-updateVertexFusion] Cluster Successful Times", cluster_times, 2);
+            _log->printTime("[main-updateVertexFusion] Sort The Sequential Set Cost", _sort_set_cost, 2);
+            _log->printTime("[main-updateVertexFusion] Modify Arrival & Sequential Pair Cost",
+                            _graph->get_modify_arrival_cost() + _modify_arrival_cost, 2);
+            _log->printTime("[main-updateVertexFusion] Modify Relative(Ancestors/Descendants) Cost",
+                            _graph->get_modify_relative_cost(), 2);
+            _log->printTime("[main-updateVertexFusion] Modify The Topo Cost", _graph->get_modify_topo_cost(), 2);
+
+            // plot
+            begin = microtime();
+            plotIncrementalGraph(_graph->get_name(), cycle_num, _para->plot_interval);
+            end = microtime();
+            _log->printTime("[main-updateVertexFusion] Print Clustering Plot Cost", end - begin, 2);
         }
     }
     replenishCluster();
+
+    // cout << endl;
     // print the final cluster num.
-    _log->printInt("Final Cluster", _clusters.size(), 1);
+    _log->printInt("[main-updateVertexFusion] Final Cluster Count", _clusters.size(), 2);
+    _log->printInt("[main-updateVertexFusion] The Single Flipflop Cluster Count", _clusters.size() - clus_num, 2);
+    _log->printInt("[main-updateVertexFusion] The Multi Flipflop Cluster Count", clus_num, 2);
+
+    // print info
+
+    _log->printTime("[main-updateVertexFusion] Sort The Sequential Set Total Cost", _sort_set_cost, 2);
+    _log->printTime("[main-updateVertexFusion] Find Ring Total Cost", _find_ring_cost, 2);
+    _log->printTime("[main-updateVertexFusion] Modify Arrival & Sequential Pair Total Cost",
+                    _graph->get_modify_arrival_cost(), 2);
+    _log->printTime("[main-updateVertexFusion] Modify Relative(Ancestors/Descendants) Total Cost",
+                    _graph->get_modify_relative_cost(), 2);
+    _log->printTime("[main-updateVertexFusion] Modify The Topo Total Cost", _graph->get_modify_topo_cost(), 2);
 }
 
 /**
@@ -673,7 +890,7 @@ void sequentialOperator::updateVertexFusion() {
  *
  */
 void sequentialOperator::printGraphInfo() {
-    _log->printInt("Vertexes Count", _graph->get_vertexes().size(), 1);
+    _log->printInt("[main-init] Vertexes Count", _graph->get_vertexes().size(), 1);
 
     uint v_pi = 0, v_po = 0, v_ff_pi = 0, v_ff_po = 0, v_ff = 0;
 
@@ -700,13 +917,13 @@ void sequentialOperator::printGraphInfo() {
         }
     }
 
-    _log->printInt("Vertex:FlipFlop", v_ff, 1);
-    _log->printInt("Vertex:PI", v_pi, 1);
-    _log->printInt("Vertex:PO", v_po, 1);
-    _log->printInt("Vertex:PI(FF)", v_ff_pi, 1);
-    _log->printInt("Vertex:PO(FF)", v_ff_po, 1);
+    _log->printInt("[main-init] Vertex:FlipFlop", v_ff, 1);
+    _log->printInt("[main-init] Vertex:PI", v_pi, 1);
+    _log->printInt("[main-init] Vertex:PO", v_po, 1);
+    _log->printInt("[main-init] Vertex:PI(FF)", v_ff_pi, 1);
+    _log->printInt("[main-init] Vertex:PO(FF)", v_ff_po, 1);
 
-    _log->printInt("Edges Count", _graph->get_edges().size(), 1);
+    _log->printInt("[main-init] Edges Count", _graph->get_edges().size(), 1);
 }
 
 // void sequentialCluster::test() {
@@ -749,8 +966,9 @@ void sequentialOperator::replenishCluster() {
     }
 }
 
-void sequentialOperator::plot() {
-    ofstream dot_seq(_circuit->get_design_name() + ".gds");
+void sequentialOperator::plotInitGraph(std::string name) {
+    string path = "plot/" + _circuit->get_design_name() + "/";
+    ofstream dot_seq(path + _circuit->get_design_name() + "_" + name + "_iter_0.gds");
     if (!dot_seq.good()) {
         _log->error("Cannot open file for writing", 1, 1);
     }
@@ -791,7 +1009,7 @@ void sequentialOperator::plot() {
         cell* cur_cell = seq_obj->get_flipflop();
         if (cur_cell) {
             feed << "BOUNDARY" << endl;
-            feed << "LAYER 1" << endl;
+            feed << "LAYER 0" << endl;
             feed << "DATATYPE 0" << endl;
             feed << "XY" << endl;
 
@@ -814,7 +1032,226 @@ void sequentialOperator::plot() {
     dot_seq.close();
 }
 
+void sequentialOperator::plotIncrementalGraph(string name, int iter, int interval) {
+    // setting path.
+    string path = "plot/" + _circuit->get_design_name() + "/";
+
+    // stream in.
+    string front_iter = std::to_string(iter - interval);
+    string in_file_name = _circuit->get_design_name() + "_" + name + "_iter_" + front_iter + ".gds";
+    ifstream in(path + in_file_name);
+    if (!in.good()) {
+        _log->error("Cannot open file for reading : " + path + in_file_name, 1, 1);
+    }
+
+    // stream out.
+    string cur_iter = std::to_string(iter);
+    string out_file_name = _circuit->get_design_name() + "_" + name + "_iter_" + cur_iter + ".gds";
+    ofstream out(path + out_file_name);
+    if (!out.good()) {
+        _log->error("Cannot open file for writing : " + path + out_file_name, 1, 1);
+    }
+
+    stringstream feed;
+    feed.precision(0);
+
+    // copy in to out.
+    vector<string> delete_line{"ENDSTR", "ENDLIB"};
+    string line;
+    while (std::getline(in, line)) {
+        // delete special line.
+        for (auto s : delete_line) {
+            if (line == s) {
+                line.replace(line.find(s), s.length(), "");
+            }
+        }
+        out << line << endl;
+    }
+
+    in.close();
+
+    // add the cluster info
+    for (auto clus : _clusters) {
+        int clus_x_min = INT_MAX;
+        int clus_y_min = INT_MAX;
+        int clus_x_max = INT_MIN;
+        int clus_y_max = INT_MIN;
+
+        for (auto flipflop : clus->get_subordinate_flipflops()) {
+            auto cur_cell = flipflop->get_flipflop();
+
+            if (flipflop->get_coord().x < clus_x_min) {
+                clus_x_min = flipflop->get_coord().x;
+            }
+
+            if (flipflop->get_coord().x + cur_cell->width > clus_x_max) {
+                clus_x_max = flipflop->get_coord().x + cur_cell->width;
+            }
+
+            if (flipflop->get_coord().y < clus_y_min) {
+                clus_y_min = flipflop->get_coord().y;
+            }
+
+            if (flipflop->get_coord().y + cur_cell->height > clus_y_max) {
+                clus_y_max = flipflop->get_coord().y + cur_cell->height;
+            }
+        }
+
+        // setting layer.
+        int layer = (iter / interval) % 255 + 1;
+
+        feed << "BOUNDARY" << endl;
+        feed << "LAYER " << layer << endl;
+        feed << "DATATYPE 0" << endl;
+        feed << "XY" << endl;
+
+        feed << clus_x_min << " : " << clus_y_min << endl;
+        feed << clus_x_max << " : " << clus_y_min << endl;
+        feed << clus_x_max << " : " << clus_y_max << endl;
+        feed << clus_x_min << " : " << clus_y_max << endl;
+        feed << clus_x_min << " : " << clus_y_min << endl;
+
+        feed << "ENDEL" << endl;
+        feed << endl;
+    }
+
+    feed << "ENDSTR" << endl;
+    feed << "ENDLIB" << endl;
+
+    out << feed.str();
+    feed.clear();
+    out.close();
+}
+
+void sequentialOperator::plotCurGraph(string name) {
+    string path = "plot/" + _circuit->get_design_name() + "/";
+    ofstream dot_seq(path + _circuit->get_design_name() + "_" + name + ".gds");
+    if (!dot_seq.good()) {
+        _log->error("Cannot open file for writing", 1, 1);
+    }
+
+    stringstream feed;
+    feed.precision(0);
+
+    // Header
+    feed << "HEADER 5" << endl;
+    feed << "BGNLIB" << endl;
+    feed << "LIBNAME TDP_Lib" << endl;
+    feed << "UNITS 0.0005 1e-9" << endl;
+    feed << "BGNSTR" << endl;
+    feed << "STRNAME plot" << endl;
+    feed << std::fixed << endl;
+
+    // print the die area
+    feed << "BOUNDARY" << endl;
+    feed << "LAYER 0" << endl;
+    feed << "DATATYPE 0" << endl;
+    feed << "XY" << endl;
+    feed << _circuit->get_lx() << " : " << _circuit->get_by() << endl;
+    feed << _circuit->get_rx() << " : " << _circuit->get_by() << endl;
+    feed << _circuit->get_rx() << " : " << _circuit->get_ty() << endl;
+    feed << _circuit->get_lx() << " : " << _circuit->get_ty() << endl;
+    feed << _circuit->get_lx() << " : " << _circuit->get_by() << endl;
+    feed << "ENDEL" << endl;
+    feed << endl;
+
+    for (auto clus : _clusters) {
+        // The cluster only flipflop itself.
+        auto clus_flipflop = clus->get_subordinate_flipflops();
+        if (clus_flipflop.size() == 1) {
+            cell* cur_cell = (*clus->get_subordinate_flipflops().begin())->get_flipflop();
+            // express flipflop.
+            feed << "BOUNDARY" << endl;
+            feed << "LAYER 1" << endl;
+            feed << "DATATYPE 0" << endl;
+            feed << "XY" << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+            feed << "ENDEL" << endl;
+            feed << endl;
+
+            // express cluster.
+            feed << "BOUNDARY" << endl;
+            feed << "LAYER 2" << endl;
+            feed << "DATATYPE 0" << endl;
+            feed << "XY" << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+            feed << "ENDEL" << endl;
+            feed << endl;
+            continue;
+        }
+
+        int clus_x_min = INT_MAX;
+        int clus_y_min = INT_MAX;
+        int clus_x_max = INT_MIN;
+        int clus_y_max = INT_MIN;
+
+        for (auto flipflop : clus_flipflop) {
+            auto cur_cell = flipflop->get_flipflop();
+
+            feed << "BOUNDARY" << endl;
+            feed << "LAYER 1" << endl;
+            feed << "DATATYPE 0" << endl;
+            feed << "XY" << endl;
+
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord << endl;
+            feed << cur_cell->x_coord + cur_cell->width << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord + cur_cell->height << endl;
+            feed << cur_cell->x_coord << " : " << cur_cell->y_coord << endl;
+
+            feed << "ENDEL" << endl;
+            feed << endl;
+
+            if (flipflop->get_coord().x < clus_x_min) {
+                clus_x_min = flipflop->get_coord().x;
+            }
+
+            if (flipflop->get_coord().x + cur_cell->width > clus_x_max) {
+                clus_x_max = flipflop->get_coord().x + cur_cell->width;
+            }
+
+            if (flipflop->get_coord().y < clus_y_min) {
+                clus_y_min = flipflop->get_coord().y;
+            }
+
+            if (flipflop->get_coord().y + cur_cell->height > clus_y_max) {
+                clus_y_max = flipflop->get_coord().y + cur_cell->height;
+            }
+        }
+
+        feed << "BOUNDARY" << endl;
+        feed << "LAYER 2" << endl;
+        feed << "DATATYPE 0" << endl;
+        feed << "XY" << endl;
+
+        feed << clus_x_min << " : " << clus_y_min << endl;
+        feed << clus_x_max << " : " << clus_y_min << endl;
+        feed << clus_x_max << " : " << clus_y_max << endl;
+        feed << clus_x_min << " : " << clus_y_max << endl;
+        feed << clus_x_min << " : " << clus_y_min << endl;
+
+        feed << "ENDEL" << endl;
+        feed << endl;
+    }
+
+    feed << "ENDSTR" << endl;
+    feed << "ENDLIB" << endl;
+
+    dot_seq << feed.str();
+    feed.clear();
+    dot_seq.close();
+}
+
 void sequentialOperator::makeNormalization() {
     std::sort(_required_skews.begin(), _required_skews.end());
     _max_required_skew = _required_skews.back();
+    _para->set_max_required_skew(_max_required_skew);
 }

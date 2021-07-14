@@ -60,6 +60,11 @@ void Logger::printInt(std::string input, int num, int verbose) {
     cout << input << " = " << num << endl;
 }
 
+void Logger::printDouble(std::string input, double num, int verbose) {
+    VERBOSE_CHECK()
+    cout << input << " = " << num << endl;
+}
+
 void Logger::printString(std::string input, std::string context, int verbose) {
     VERBOSE_CHECK()
     cout << input << " : " << context << endl;
