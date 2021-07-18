@@ -21,7 +21,8 @@ inline bool operator<(const row &a, const row &b)
 	return (a.origY < b.origY) || (a.origY == b.origY && a.origX < b.origX);
 }
 
-void circuit::read_parameters(const char* input)
+void circuit::
+read_parameters(const char* input)
 {
   cout << endl << "Reading parameter file .." <<endl;
   cout << "-------------------------------------------------------------------------------" <<endl;

@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     double begin, end;
 
     // Print Title
-    _log->displayTitle(argc, argv, 1);
+    _log->displayTitle(argc, argv, 1); 
 
     // Read File Run Time Begin
     begin = microtime();
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
 
     // Cluster FlipFlop
     begin = microtime();
-    sequentialOperator* _cluster_ff = new sequentialOperator(para, _circuit, _log);
+    sequentialOperator* _cluster_ff = new sequentialOperator(para, _circuit, _log); 
     end = microtime();
     _log->printTime("[main] Init Flipflop Complete Topological Relations", end - begin, 1);
 

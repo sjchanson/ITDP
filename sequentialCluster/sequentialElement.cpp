@@ -121,10 +121,14 @@ void sequentialFlipFlop::update() {
     // TODO.
 }
 
-sequentialFlipFlop* sequentialFlipFlop::get_max_skew_source() {
+sequentialFlipFlop* sequentialFlipFlop::get_max_skew_flipflop_source() {
     double max_skew = this->get_max_skew();
+    double epslion = 1e-8;
     for (auto f : _skews) {
-        if (f.second == max_skew) {
+        if (f.first->get_type() != 3) {
+            continue;
+        }
+        if (fabs(f.second - max_skew) < epslion) {
             return dynamic_cast<sequentialFlipFlop*>(f.first);
         }
     }

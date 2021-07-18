@@ -40,7 +40,6 @@ ctsSingleClus::ctsSingleClus(
         flipflops)
     : ctsSingleClus() {
     _origin_flipflops = flipflops;
-    init();
 }
 
 ctsSingleClus::~ctsSingleClus() {
@@ -88,7 +87,7 @@ void ctsSingleClus::analyseSinkRelationship() {
         if (flipflop->get_max_skew() == 0.0) {
             break;
         }
-        auto src_flipflop = flipflop->get_max_skew_source();  // the src must exist because the max skew exist.
+        auto src_flipflop = flipflop->get_max_skew_flipflop_source();  // the src must exist because the max skew exist.
         auto it = std::find_if(_binary_flipflops.begin(), _binary_flipflops.end(),
                                [src_flipflop](const sequentialFlipFlop *f) { return *src_flipflop == *f; });
         if (it != _binary_flipflops.end()) {
@@ -276,9 +275,16 @@ ctsBase::~ctsBase() {
 }
 
 void ctsBase::init() {
+    omp_set_num_threads(60);
+
     for (auto clus : _clusters) {
         auto sub_flipflops = clus->get_subordinate_flipflops();
         ctsSingleClus *sub_cluster = new ctsSingleClus(sub_flipflops);
         _sub_clusters.push_back(sub_cluster);
+    }
+
+#pragma omp parallel for
+    for (auto sub_cluster : _sub_clusters) {
+        sub_cluster->init();
     }
 }

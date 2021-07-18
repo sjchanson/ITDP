@@ -108,7 +108,7 @@ public:
     cell* get_flipflop() const { return _flipflop; }
     pin* get_input_pin() const { return _input_pin; }
 
-    sequentialFlipFlop* get_max_skew_source();
+    sequentialFlipFlop* get_max_skew_flipflop_source();
 
     void set_ff_pi() { _is_ff_pi = 1; }
     void set_ff_po() { _is_ff_po = 1; }

@@ -1,5 +1,10 @@
 #include "sequentialOperator.h"
 
+#include <bits/stdc++.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -843,27 +848,27 @@ void sequentialOperator::updateVertexFusion() {
         clus_num = _clusters.size();
         cycle_num++;
         if (cycle_num % _para->plot_interval == 0) {
-            _fusion_tmp_cost = _fusion_total_cost - _fusion_tmp_cost;
-            // print info
-            // cout << endl;
-            _log->printInt("[main-updateVertexFusion] Current iterations", cycle_num, 2);
-            _log->printTime("[main-updateVertexFusion] The Last 100 iterations Cost", _fusion_tmp_cost, 2);
-            _log->printInt("[main-updateVertexFusion] Current Cluster Count", clus_num, 2);
-            _log->printInt("[main-updateVertexFusion] Looping Times", loop_cnt, 2);
-            _log->printTime("[main-updateVertexFusion] Find Ring Cost", _find_ring_cost, 2);
-            _log->printInt("[main-updateVertexFusion] Cluster Successful Times", cluster_times, 2);
-            _log->printTime("[main-updateVertexFusion] Sort The Sequential Set Cost", _sort_set_cost, 2);
-            _log->printTime("[main-updateVertexFusion] Modify Arrival & Sequential Pair Cost",
-                            _graph->get_modify_arrival_cost() + _modify_arrival_cost, 2);
-            _log->printTime("[main-updateVertexFusion] Modify Relative(Ancestors/Descendants) Cost",
-                            _graph->get_modify_relative_cost(), 2);
-            _log->printTime("[main-updateVertexFusion] Modify The Topo Cost", _graph->get_modify_topo_cost(), 2);
+            // _fusion_tmp_cost = _fusion_total_cost - _fusion_tmp_cost;
+            // // print info
+            // // cout << endl;
+            // _log->printInt("[main-updateVertexFusion] Current iterations", cycle_num, 2);
+            // _log->printTime("[main-updateVertexFusion] The Last 100 iterations Cost", _fusion_tmp_cost, 2);
+            // _log->printInt("[main-updateVertexFusion] Current Cluster Count", clus_num, 2);
+            // _log->printInt("[main-updateVertexFusion] Looping Times", loop_cnt, 2);
+            // _log->printTime("[main-updateVertexFusion] Find Ring Cost", _find_ring_cost, 2);
+            // _log->printInt("[main-updateVertexFusion] Cluster Successful Times", cluster_times, 2);
+            // _log->printTime("[main-updateVertexFusion] Sort The Sequential Set Cost", _sort_set_cost, 2);
+            // _log->printTime("[main-updateVertexFusion] Modify Arrival & Sequential Pair Cost",
+            //                 _graph->get_modify_arrival_cost() + _modify_arrival_cost, 2);
+            // _log->printTime("[main-updateVertexFusion] Modify Relative(Ancestors/Descendants) Cost",
+            //                 _graph->get_modify_relative_cost(), 2);
+            // _log->printTime("[main-updateVertexFusion] Modify The Topo Cost", _graph->get_modify_topo_cost(), 2);
 
-            // plot
-            begin = microtime();
-            plotIncrementalGraph(_graph->get_name(), cycle_num, _para->plot_interval);
-            end = microtime();
-            _log->printTime("[main-updateVertexFusion] Print Clustering Plot Cost", end - begin, 2);
+            // // plot
+            // begin = microtime();
+            // plotIncrementalGraph(_graph->get_name(), cycle_num, _para->plot_interval);
+            // end = microtime();
+            // _log->printTime("[main-updateVertexFusion] Print Clustering Plot Cost", end - begin, 2);
         }
     }
     replenishCluster();
@@ -967,8 +972,14 @@ void sequentialOperator::replenishCluster() {
 }
 
 void sequentialOperator::plotInitGraph(std::string name) {
-    string path = "plot/" + _circuit->get_design_name() + "/";
-    ofstream dot_seq(path + _circuit->get_design_name() + "_" + name + "_iter_0.gds");
+    string path = "plot";
+    if (opendir(path.c_str()) == nullptr) {
+        if (mkdir(path.c_str(), 0777) == -1) {
+            _log->error("ERROR In Create The Folder", 1, 1);
+        }
+    }
+
+    ofstream dot_seq(path + "/" + _circuit->get_design_name() + "_" + name + "_iter_0.gds");
     if (!dot_seq.good()) {
         _log->error("Cannot open file for writing", 1, 1);
     }
@@ -1124,8 +1135,13 @@ void sequentialOperator::plotIncrementalGraph(string name, int iter, int interva
 }
 
 void sequentialOperator::plotCurGraph(string name) {
-    string path = "plot/" + _circuit->get_design_name() + "/";
-    ofstream dot_seq(path + _circuit->get_design_name() + "_" + name + ".gds");
+    string path = "plot";
+    if (opendir(path.c_str()) == nullptr) {
+        if (mkdir(path.c_str(), 0777) == -1) {
+            _log->error("ERROR In Create The Folder", 1, 1);
+        }
+    }
+    ofstream dot_seq(path + "/" + _circuit->get_design_name() + "_" + name + ".gds");
     if (!dot_seq.good()) {
         _log->error("Cannot open file for writing", 1, 1);
     }

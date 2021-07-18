@@ -136,6 +136,7 @@ public:
     ~ctsSingleClus();
 
     std::vector<ClusterVertex *> get_binary_tree() const { return _binary_tree; }
+    void init();  // flipflops of a cluster -> binary tree.
 
 private:
     int _transition_point_cnt;
@@ -152,7 +153,6 @@ private:
 
     std::vector<ctsEdge *> _edges;  // all Edge connection.
 
-    void init();  // flipflops of a cluster -> binary tree.
     void analyseSinkRelationship();
     void constructPerfectBinaryTree();
     void analyseBFS(std::queue<ClusterVertex *> &queue);
