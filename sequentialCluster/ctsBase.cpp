@@ -221,6 +221,7 @@ std::list<ClusterVertex *> ctsSingleClus::updateUpLevelVertexes(std::list<Cluste
     return up_vertex_list;
 }
 
+
 void ctsSingleClus::constructPerfectBinaryTree() {
     // Complete perfect binary tree.
     for (auto vertex : _vertexes) {
