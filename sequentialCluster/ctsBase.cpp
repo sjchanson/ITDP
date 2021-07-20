@@ -1,5 +1,15 @@
 #include "ctsBase.h"
 
+#include <bits/stdc++.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <iomanip>
+#include <sstream>
+
+#include "omp.h"
+
 ClusterVertex::ClusterVertex() : _name(""), _level(INT_MAX), _point(nullptr), _skew(0) {}
 
 ClusterVertex::ClusterVertex(sequentialFlipFlop *flipflop) : ClusterVertex() {
@@ -33,12 +43,14 @@ ClusterVertexPair::ClusterVertexPair(ClusterVertex *v1, ClusterVertex *v2) : Clu
         abs(v1->get_point()->getX() - v2->get_point()->getX()) + abs(v1->get_point()->getY() - v2->get_point()->getY());
 }
 
-ctsSingleClus::ctsSingleClus() : _transition_point_cnt(0), _top_level(0), _root_vertex(nullptr) {}
+ctsSingleClus::ctsSingleClus() : _name(""), _transition_point_cnt(0), _top_level(0), _root_vertex(nullptr) {}
 
 ctsSingleClus::ctsSingleClus(
     std::unordered_set<sequentialFlipFlop *, sequentialFlipFlop::basePtrHash, sequentialFlipFlop::basePtrEqual>
-        flipflops)
+        flipflops,
+    string name)
     : ctsSingleClus() {
+    _name = name;
     _origin_flipflops = flipflops;
 }
 
@@ -47,12 +59,11 @@ ctsSingleClus::~ctsSingleClus() {
     _origin_flipflops.clear();
 }
 
-void ctsSingleClus::init() {
-    analyseSinkRelationship();
-    constructPerfectBinaryTree();
-}
+void ctsSingleClus::analyseSinkRelationship(ofstream &sheet_stream) {
+    // print the flipflop sheet.
+    stringstream feed;
+    feed.precision(5);
 
-void ctsSingleClus::analyseSinkRelationship() {
     for (auto cur_f : _origin_flipflops) {
         // Judge if the source flipflop is with the class.
         bool is_existed = false;
@@ -91,16 +102,35 @@ void ctsSingleClus::analyseSinkRelationship() {
         auto it = std::find_if(_binary_flipflops.begin(), _binary_flipflops.end(),
                                [src_flipflop](const sequentialFlipFlop *f) { return *src_flipflop == *f; });
         if (it != _binary_flipflops.end()) {
+            // print sheet.
+            feed << "," << src_flipflop->get_name() << "," << flipflop->get_name() << ","
+                 << flipflop->get_input_pin()->lateSlk << std::endl;
+
             _binary_flipflops.remove_if([src_flipflop](const sequentialFlipFlop *f) { return *src_flipflop == *f; });
+            _binary_flipflops.remove_if([flipflop](const sequentialFlipFlop *f) { return *flipflop == *f; });
             // make the vertex.
             auto up_vertex = buildVertexes(src_flipflop, flipflop, _transition_point_cnt++);
             level_up_list.push_back(up_vertex);
+            continue;
         }
+
+        // print sheet.
+        // find origin flipflop info.
+        auto origin_it = _origin_flipflops.find(flipflop);
+        feed << ","
+             << "," << flipflop->get_name() << "," << (*origin_it)->get_input_pin()->lateSlk << std::endl;
+
         _binary_flipflops.remove_if([flipflop](const sequentialFlipFlop *f) { return *flipflop == *f; });
     }
 
     // remain _binary_flipflops become vertexes.
     for (auto remain_flipflop : _binary_flipflops) {
+        // print sheet.
+        // find origin flipflop info.
+        auto origin_it = _origin_flipflops.find(remain_flipflop);
+        feed << ","
+             << "," << remain_flipflop->get_name() << "," << (*origin_it)->get_input_pin()->lateSlk << std::endl;
+
         ClusterVertex *cur_vertex = new ClusterVertex(remain_flipflop);
 
         remain_list.push_back(cur_vertex);
@@ -120,6 +150,9 @@ void ctsSingleClus::analyseSinkRelationship() {
     _root_vertex = *level_up_list.begin();
     _root_vertex->set_level(++_top_level);
     _vertexes.push_back(_root_vertex);
+
+    sheet_stream << feed.str();
+    feed.clear();
 }
 
 ClusterVertex *ctsSingleClus::buildVertexes(sequentialFlipFlop *from, sequentialFlipFlop *to, int transition_cnt) {
@@ -221,7 +254,6 @@ std::list<ClusterVertex *> ctsSingleClus::updateUpLevelVertexes(std::list<Cluste
     return up_vertex_list;
 }
 
-
 void ctsSingleClus::constructPerfectBinaryTree() {
     // Complete perfect binary tree.
     for (auto vertex : _vertexes) {
@@ -276,16 +308,29 @@ ctsBase::~ctsBase() {
 }
 
 void ctsBase::init() {
-    omp_set_num_threads(60);
-
     for (auto clus : _clusters) {
         auto sub_flipflops = clus->get_subordinate_flipflops();
-        ctsSingleClus *sub_cluster = new ctsSingleClus(sub_flipflops);
+        ctsSingleClus *sub_cluster = new ctsSingleClus(sub_flipflops, clus->get_name());
         _sub_clusters.push_back(sub_cluster);
     }
 
-#pragma omp parallel for
-    for (auto sub_cluster : _sub_clusters) {
-        sub_cluster->init();
+    string path = "sheet";
+    string file_name = "simple";
+    if (opendir(path.c_str()) == nullptr) {
+        if (mkdir(path.c_str(), 0777) == -1) {
+            std::cout << "ERROR In Create The Folder." << std::endl;
+        }
     }
+    ofstream sheet_stream(path + "/" + file_name + ".csv");
+    sheet_stream << "CLUSTER_NAME,"
+                 << "SOURCE_FLIPFLOP,"
+                 << "SINK_FLIPFLOP,"
+                 << "SLACK" << std::endl;
+
+    for (auto sub_cluster : _sub_clusters) {
+        sheet_stream << sub_cluster->get_name() << std::endl;
+        sub_cluster->analyseSinkRelationship(sheet_stream);
+        sub_cluster->constructPerfectBinaryTree();
+    }
+    sheet_stream.close();
 }

@@ -27,6 +27,7 @@ sequentialOperator::sequentialOperator()
     , _sort_set_cost(0.0)
     , _find_ring_cost(0.0)
     , _fusion_total_cost(0.0)
+
     , _fusion_tmp_cost(0.0)
     , _modify_arrival_cost(0.0) {}
 
@@ -42,6 +43,9 @@ sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger
 
     // get cells pointer.
     for (auto& cell : _circuit->getCells()) {
+        if (cell.isLCB) {
+            _lcb_vec.push_back(&cell);
+        }
         _cell_vec.push_back(&cell);
     }
     // get macros pointer.
@@ -64,6 +68,30 @@ sequentialOperator::sequentialOperator(parameter* para, circuit* circuit, Logger
             _is_visited_ff[cell->name] = false;  // init the flipflop visit.
             _flipflop_vec.push_back(cell);
         }
+    }
+
+    // get LCB & Flipflop Type.
+    std::set<string> lcb_string_set;
+    std::set<string> flipflop_string_set;
+    auto macro_vec = _circuit->getMacros();
+    for (auto lcb : _lcb_vec) {
+        int macro_id = static_cast<int>(lcb->type);
+        auto macro = macro_vec[macro_id];
+        lcb_string_set.emplace(macro.name);
+    }
+
+    for (auto flipflop : _flipflop_vec) {
+        int macro_id = static_cast<int>(flipflop->type);
+        auto macro = macro_vec[macro_id];
+        flipflop_string_set.emplace(macro.name);
+    }
+    _log->printInt("LCB CELL TYPE", lcb_string_set.size(), 1);
+    for (auto lcb_name : lcb_string_set) {
+        _log->printString("TYPE", lcb_name, 1);
+    }
+    _log->printInt("FLIPFLIP CELL TYPE", flipflop_string_set.size(), 1);
+    for (auto flipflop_name : flipflop_string_set) {
+        _log->printString("TYPE", flipflop_name, 1);
     }
 
     init();
@@ -100,6 +128,10 @@ sequentialOperator::~sequentialOperator() {
         net = nullptr;
     }
 
+    for (auto& lcb : _lcb_vec) {
+        lcb = nullptr;
+    }
+
     for (auto& flipflop : _flipflop_vec) {
         flipflop = nullptr;
     }
@@ -111,6 +143,34 @@ sequentialOperator::~sequentialOperator() {
         delete opt;
     }
     _sequential_opt_vec.clear();
+}
+
+void sequentialOperator::cleanLCBInDEF() {
+    ifstream in("/root/iTDP/benchmark/mycase/simple.def");
+    if (!in.good()) {
+        _log->error("Cannot open file to read", 1, 1);
+    }
+    ofstream out("/root/iTDP/benchmark/mycase/simple_tmp.def");
+    if (!out.good()) {
+        _log->error("Cannot open flie to write", 1, 1);
+    }
+    ReviseDEF().cleanLCBConnection(in, out, _cell_vec.size() - _lcb_vec.size());
+    in.close();
+    out.close();
+}
+
+void sequentialOperator::cleanLCBInVerilog() {
+    ifstream in("/root/iTDP/benchmark/mycase/simple.v");
+    if (!in.good()) {
+        _log->error("Cannot open file to read", 1, 1);
+    }
+    ofstream out("/root/iTDP/benchmark/mycase/simple_tmp.v");
+    if (!out.good()) {
+        _log->error("Cannot open flie to write", 1, 1);
+    }
+    ReviseVerilog().cleanLCBConnection(in, out);
+    in.close();
+    out.close();
 }
 
 void sequentialOperator::traverseFlipflop() {
@@ -689,7 +749,7 @@ void sequentialOperator::updateVertexFusion() {
         std::set<sequentialPair*, sequentialPairCmp>::iterator sort_iter = sort_sequential_pair.begin();
         sequentialVertex* v1 = (*sort_iter)->get_vertex1();
         sequentialVertex* v2 = (*sort_iter)->get_vertex2();
-        double distance = (*sort_iter)->get_distance();
+        // double distance = (*sort_iter)->get_distance();
 
         // identify the ring.
         begin = microtime();

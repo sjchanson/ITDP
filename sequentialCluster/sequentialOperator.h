@@ -21,6 +21,8 @@
 #include "../include/logger.h"
 #include "../include/parameter.h"
 #include "../include/utility.h"
+#include "../reviseFile/ReviseDEF.h"
+#include "../reviseFile/ReviseVerilog.h"
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 
@@ -44,6 +46,10 @@ public:
     sequentialOperator(parameter* para, circuit* circuit, Logger* log);
     sequentialOperator(parameter* para, circuit* circuit, Logger* log, sequentialGraph* graph);
     ~sequentialOperator();
+
+    // test for modify def.
+    void cleanLCBInDEF();
+    void cleanLCBInVerilog();
 
     // generate the flipflops according to vertex.
     void traverseFlipflop();
@@ -81,6 +87,7 @@ private:
     vector<macro*> _macro_vec;
     vector<pin*> _pin_vec;
     vector<net*> _net_vec;
+    vector<cell*> _lcb_vec;
     vector<cell*> _flipflop_vec;
 
     std::unordered_map<std::string, bool> _is_visited_ff;

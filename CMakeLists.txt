@@ -24,6 +24,7 @@ endif()
 # Set
 SET(FLUTE_HOME ${PROJECT_SOURCE_DIR}/Flute)
 SET(CLUSTER_HOME ${PROJECT_SOURCE_DIR}/sequentialCluster)
+SET(REVISE_HOME ${PROJECT_SOURCE_DIR}/reviseFile)
 
 # Header file directory
 include_directories(${PROJECT_SOURCE_DIR}/library)
@@ -35,6 +36,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 add_subdirectory(${FLUTE_HOME})
 add_subdirectory(${CLUSTER_HOME})
+add_subdirectory(${REVISE_HOME})
 aux_source_directory(. DIR_SRCS)
 
 # Link
@@ -45,3 +47,4 @@ add_executable(iTDPlacer ${DIR_SRCS})
 target_link_libraries(iTDPlacer ui-timer)
 target_link_libraries(iTDPlacer flute)
 target_link_libraries(iTDPlacer sequentalCluster)
+target_link_libraries(iTDPlacer reviseFile)

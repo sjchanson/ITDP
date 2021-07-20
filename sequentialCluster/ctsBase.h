@@ -9,6 +9,7 @@
  *
  */
 
+#include <iostream>
 #include <queue>
 #include <stack>
 #include <vector>
@@ -132,13 +133,18 @@ public:
     ctsSingleClus();
     ctsSingleClus(
         std::unordered_set<sequentialFlipFlop *, sequentialFlipFlop::basePtrHash, sequentialFlipFlop::basePtrEqual>
-            flipflops);
+            flipflops,
+        string name);
     ~ctsSingleClus();
 
+    string get_name() const { return _name; }
+
     std::vector<ClusterVertex *> get_binary_tree() const { return _binary_tree; }
-    void init();  // flipflops of a cluster -> binary tree.
+    void analyseSinkRelationship(ofstream &sheet_stream);
+    void constructPerfectBinaryTree();
 
 private:
+    string _name;
     int _transition_point_cnt;
     int _top_level;
 
@@ -153,8 +159,6 @@ private:
 
     std::vector<ctsEdge *> _edges;  // all Edge connection.
 
-    void analyseSinkRelationship();
-    void constructPerfectBinaryTree();
     void analyseBFS(std::queue<ClusterVertex *> &queue);
     ClusterVertex *buildVertexes(sequentialFlipFlop *from, sequentialFlipFlop *to, int transition_cnt);
     std::list<ClusterVertex *> updateUpLevelVertexes(std::list<ClusterVertex *> cur_vertexes, int level);

@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     double begin, end;
 
     // Print Title
-    _log->displayTitle(argc, argv, 1); 
+    _log->displayTitle(argc, argv, 1);
 
     // Read File Run Time Begin
     begin = microtime();
@@ -39,9 +39,13 @@ int main(int argc, char** argv) {
 
     // Cluster FlipFlop
     begin = microtime();
-    sequentialOperator* _cluster_ff = new sequentialOperator(para, _circuit, _log); 
+    sequentialOperator* _cluster_ff = new sequentialOperator(para, _circuit, _log);
     end = microtime();
     _log->printTime("[main] Init Flipflop Complete Topological Relations", end - begin, 1);
+
+    // test
+    _cluster_ff->cleanLCBInDEF();
+    _cluster_ff->cleanLCBInVerilog();
 
     // Check if the graph has a ring
     // begin = microtime();
@@ -53,6 +57,7 @@ int main(int argc, char** argv) {
     begin = microtime();
     _cluster_ff->plotInitGraph("origin");
     end = microtime();
+    _log->printTime("[main] Init The subGraphs", end - begin, 1);
 
     // init the sub graph.
     begin = microtime();
@@ -88,7 +93,8 @@ int main(int argc, char** argv) {
     ctsBase* base = new ctsBase(_cluster_ff->get_clusters());
     end = microtime();
     _log->printTime("[main] Build The Perfect Binary Tree", end - begin, 1);
-
+    delete base;
+    base = nullptr;
 
     return 0;
 }
