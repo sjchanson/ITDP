@@ -14,60 +14,12 @@
 #include <stack>
 #include <vector>
 
+#include "common/utility.h"
 #include "sequentialOperator.h"
 
 #pragma once
 
-typedef long long DBU;
-
 class ctsEdge;
-
-// fun-2
-template <class T>
-
-class Point {
-public:
-    Point(T x, T y) : _x(x), _y(y) {}
-
-    T getX() const { return _x; }
-    T getY() const { return _y; }
-
-    T computeDist(const Point<T> &other) const {
-        T dx = (getX() > other.getX()) ? (getX() - other.getX()) : (other.getX() - getX());
-        T dy = (getY() > other.getY()) ? (getY() - other.getY()) : (other.getY() - getY());
-
-        return dx + dy;
-    }
-
-    T computeDistX(const Point<T> &other) const {
-        T dx = (getX() > other.getX()) ? (getX() - other.getX()) : (other.getX() - getX());
-        return dx;
-    }
-
-    T computeDistY(const Point<T> &other) const {
-        T dy = (getY() > other.getY()) ? (getY() - other.getY()) : (other.getY() - getY());
-        return dy;
-    }
-
-    bool operator<(const Point<T> &other) const {
-        if (getX() != other.getX()) {
-            return getX() < other.getX();
-        } else {
-            return getY() < other.getY();
-        }
-    }
-
-    friend ostream &operator<<(ostream &out, const Point<T> &point) {
-        out << "[(" << point.getX() << ", " << point.getY() << ")]";
-        return out;
-    }
-
-    bool isUnLegal() const { return _x == -1 && _y == -1; }
-
-private:
-    T _x;
-    T _y;
-};
 
 class ClusterVertex {
 public:

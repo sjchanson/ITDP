@@ -10,6 +10,7 @@
  */
 
 #pragma once
+#include <string>
 
 class parameter {
 public:
@@ -21,6 +22,9 @@ public:
     int plot_interval;
     int pre_clus_size;
     int lamda;
+    std::string benchmark_path;
+    std::string clean_prefix;
+    std::string modify_prefix;
 
     parameter();
     void reset() {}

@@ -16,8 +16,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "../evaluate.h"
-#include "../include/parameter.h"
+#include "common/parameter.h"
+#include "evaluate.h"
 
 class cluster;
 

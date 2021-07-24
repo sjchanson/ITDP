@@ -21,8 +21,8 @@
 #include <vector>
 
 // #include "../evaluate.h"
-#include "../include/logger.h"
-#include "../include/utility.h"
+#include "common/logger.h"
+#include "common/utility.h"
 #include "sequentialElement.h"
 
 class sequentialElement;

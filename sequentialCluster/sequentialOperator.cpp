@@ -145,6 +145,16 @@ sequentialOperator::~sequentialOperator() {
     _sequential_opt_vec.clear();
 }
 
+std::vector<sequentialFlipFlop*> sequentialOperator::get_sequential_flipflop_vec() {
+    std::vector<sequentialFlipFlop*> sequential_flipflop_vec;
+    sequential_flipflop_vec.reserve(_flipflops.size());
+    for (auto it = _flipflops.begin(); it != _flipflops.end(); it++) {
+        auto tmp = *it;
+        sequential_flipflop_vec.push_back(*it);
+    }
+    return sequential_flipflop_vec;
+}
+
 void sequentialOperator::cleanLCBInDEF() {
     ifstream in("/root/iTDP/benchmark/mycase/simple.def");
     if (!in.good()) {

@@ -17,10 +17,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../evaluate.h"
-#include "../include/logger.h"
-#include "../include/parameter.h"
-#include "../include/utility.h"
+#include "evaluate.h"
+#include "common/logger.h"
+#include "common/parameter.h"
+#include "common/utility.h"
 #include "../reviseFile/ReviseDEF.h"
 #include "../reviseFile/ReviseVerilog.h"
 #include "sequentialElement.h"
@@ -77,6 +77,7 @@ public:
     void printArrival();
     void printSequentialPair();
     std::unordered_set<sequentialCluster*, baseHash, baseEqual> get_clusters() const { return _clusters; }
+    std::vector<sequentialFlipFlop*> get_sequential_flipflop_vec();
 
 private:
     parameter* _para;

@@ -24,8 +24,8 @@
 #include <sstream>
 #include <vector>
 
-#include "Flute/flute.h"
-#include "library/uit_timer.h"
+#include "../Flute/flute.h"
+#include "../library/uit_timer.h"
 
 /* density profiling related parms */
 #define BIN_DIM 9.0
@@ -377,7 +377,6 @@ public:
     vector<pin> &getPins() { return pins; }
     vector<row> &getRows() { return rows; }
 
-    
     vector<unsigned> &pIs() { return PIs; }
     vector<unsigned> &pOs() { return POs; }
     uit::Timer &get_timer() { return timer; }
