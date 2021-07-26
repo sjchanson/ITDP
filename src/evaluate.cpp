@@ -8,6 +8,8 @@
 
 #include "evaluate.h"
 
+#include <unistd.h>
+
 // SPEF: FF
 #define CAP_SCALE 1.0e-15
 // SPEF: kOhm
@@ -34,6 +36,9 @@ bool circuit::measure_timing() {
     strcpy(arguments[0], "ui-timer2.0");
     strcpy(arguments[1], (filename + ".tau2015").c_str());
     strcpy(arguments[2], (filename + ".timing").c_str());
+
+    string path = getcwd(NULL, 0);
+    std::cout << path << std::endl;
 
     using namespace uit;
     // Timer timer;

@@ -4,9 +4,13 @@
 #include <iostream>
 #include <sstream>
 
-runItdp::runItdp() : _log(nullptr), _circuit(nullptr), _para(nullptr), _opt(nullptr), _base(nullptr) {}
+runItdp::runItdp()
+    : _argc(0), _argv(nullptr), _log(nullptr), _circuit(nullptr), _para(nullptr), _opt(nullptr), _base(nullptr) {}
 
-runItdp::runItdp(int argc, char** argv) : runItdp() { init(argc, argv); }
+runItdp::runItdp(int argc, char** argv) : runItdp() {
+    _argc = argc;
+    _argv = argv;
+}
 
 runItdp::~runItdp() {
     delete _log;
@@ -31,7 +35,8 @@ void runItdp::read_clean_lcb_file(int argc, char** argv) {
     cleanLCBInVerilog(_para->benchmark_path, _para->clean_prefix);
 
     // read the file after cleaning.
-    string iccad_file = _para->benchmark_path + "/" + _circuit->get_design_name() + "/" + "clean_superblue18.iccad2015";
+    string iccad_file = _para->benchmark_path + "/" + _circuit->get_design_name() + "/" + "clean_" +
+                        _circuit->get_design_name() + ".iccad2015";
     argv[2] = (char*)iccad_file.c_str();
     init(argc, argv);
 
@@ -128,10 +133,6 @@ void runItdp::init(int argc, char** argv) {
     end = microtime();
     _log->printTime("[main] Init Flipflop Complete Topological Relations", end - begin, 1);
 
-    // test
-    _opt->cleanLCBInDEF();
-    _opt->cleanLCBInVerilog();
-
     // Check if the graph has a ring
     // begin = microtime();
     // _opt->test();
@@ -182,6 +183,7 @@ void runItdp::init(int argc, char** argv) {
 
 void runItdp::cleanLCBInDEF(string path, string prefix, int component_cnt) {
     string design_name = _circuit->get_design_name();
+    string tmp = path + "/" + design_name + "/" + design_name + ".def";
     ifstream in(path + "/" + design_name + "/" + design_name + ".def");
     if (!in.good()) {
         _log->error("Cannot open file to read", 1, 1);

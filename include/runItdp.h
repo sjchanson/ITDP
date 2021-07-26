@@ -29,7 +29,11 @@ public:
 
     void write_lcb(map<string, Point<DBU>*> lcbs);
 
+    void init(int argc, char** argv);
+
 private:
+    int _argc;
+    char** _argv;
     Logger* _log;
     circuit* _circuit;
     parameter* _para;
@@ -37,7 +41,6 @@ private:
     ctsBase* _base;
     std::vector<string> _pin_name_vec;
 
-    void init(int argc, char** argv);
     void cleanLCBInDEF(string path, string prefix, int component_cnt);
     void cleanLCBInVerilog(string path, string prefix);
 
