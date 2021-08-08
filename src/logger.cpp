@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 
+namespace itdp {
 using std::cout;
 using std::endl;
 using std::string;
@@ -12,7 +13,7 @@ using std::string;
         return;               \
     };
 
-Logger::Logger(string name, int verbose) : _name(name), _verbose(verbose) {}
+Logger::Logger(string name, int verbose) : _verbose(verbose), _name(name) {}
 
 // Procedure title
 void Logger::displayTitle(int argc, char** argv, int verbose) {
@@ -74,3 +75,4 @@ void Logger::printItself(std::string context, int verbose) {
     VERBOSE_CHECK()
     cout << context << endl;
 }
+}  // namespace itdp

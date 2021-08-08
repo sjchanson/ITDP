@@ -562,6 +562,18 @@ void sequentialOperator::updatePreClusteres() {
         }
     }
 
+    // modify the origin graph.
+    for (auto opt : _sequential_opt_vec) {
+        for (auto clus : opt->get_clusters()) {
+            std::vector<sequentialVertex*> clus_vertexes;
+            for (auto flipflop : clus->get_subordinate_flipflops()) {
+                auto vertex = _graph->get_vertex(flipflop->get_name());
+                clus_vertexes.push_back(vertex);
+            }
+            // _graph->makeBatchVertexFusion();
+        }
+    }
+
     _log->printInt("[main-updatePreClusters] Total Cluster", total_clus_cnt, 1);
     _log->printInt("[main-updatePreClusters] Total Merge Sigle Cluster", single_cnt, 1);
     _log->printInt("[main-updatePreClusters] Total Merge Couple Cluster", couple_cnt, 1);

@@ -1,3 +1,10 @@
+/*
+ * @Author: ShiJian Chen
+ * @Date: 2021-07-14 14:37:40
+ * @LastEditors: Shijian Chen
+ * @LastEditTime: 2021-08-01 17:19:50
+ * @Description:
+ */
 /**
  * @file logger.h
  * @author SJchan (13560469332@163.com)
@@ -9,13 +16,18 @@
  *
  */
 
-#include <string>
+#ifndef ITDP_LOGGER
+#define ITDP_LOGGER
 
-#pragma once
+#include <string>
+namespace itdp {
 
 class Logger {
 public:
-    Logger(std::string name, int verbose);
+    static Logger* get_logger_obj(std::string name, int verbose) {
+        static Logger _log(name, verbose);
+        return &_log;
+    }
 
     // Print functions
     void displayTitle(int argc, char** argv, int verbose);
@@ -36,7 +48,15 @@ public:
 
     void printItself(std::string context, int verbose);
 
+    // private:
+    //     static Logger _log;
+
 private:
+    Logger(std::string name, int verbose);
+    ~Logger() {}
     int _verbose;
     std::string _name;
 };
+
+}  // namespace itdp
+#endif

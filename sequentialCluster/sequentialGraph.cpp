@@ -1379,6 +1379,78 @@ void sequentialGraph::updateCoordMapping() {
     std::sort(_y_coords.begin(), _y_coords.end());
 }
 
+/**
+ *  Modify the graph after subCluster.
+ *
+ */
+void sequentialGraph::makeBatchVertexFusion(std::vector<sequentialVertex*> clus_vertexes, sequentialBase* lcb) {
+    sequentialVertex* new_vertex = new sequentialVertex(lcb);
+    std::vector<sequentialVertex*> src_vertexes;
+    std::vector<sequentialVertex*> sink_vertexes;
+
+    for (auto inner_vertex : clus_vertexes) {
+        // change the src vertex connection.
+        for (auto edge : inner_vertex->get_src_edges()) {
+            sequentialVertex* src_vertex = edge->get_src();
+            // find the src_vertex in src_vertexes.
+            auto it = std::find_if(clus_vertexes.begin(), clus_vertexes.end(),
+                                   [src_vertex](sequentialVertex* v) { return *src_vertex == *v; });
+            if (it == clus_vertexes.end()) {
+                edge->updateSink(new_vertex);
+
+                bool is_exist = false;
+                for (auto e : new_vertex->get_src_edges()) {
+                    if (*(e->get_src()) == *(edge->get_src())) {
+                        is_exist = true;
+                        break;
+                    }
+                }
+
+                if (!is_exist) {
+                    new_vertex->add_src_edges(edge);  // add edge.
+                }
+                src_vertexes.push_back(*it);
+            } else {
+                // delete those edge.
+            }
+        }
+
+        // change the sink vertex connection.
+        for (auto edge : inner_vertex->get_sink_edges()) {
+            sequentialVertex* sink_vertex = edge->get_sink();
+            // find the sink_vertex in sink_vertexes.
+            auto it = std::find_if(clus_vertexes.begin(), clus_vertexes.end(),
+                                   [sink_vertex](sequentialVertex* v) { return *sink_vertex == *v; });
+            if (it == clus_vertexes.end()) {
+                edge->updateSrc(new_vertex);
+
+                bool is_exist = false;
+                for (auto e : new_vertex->get_sink_edges()) {
+                    if (*(e->get_sink()) == *(edge->get_sink())) {
+                        is_exist = true;
+                        break;
+                    }
+                }
+
+                if (!is_exist) {
+                    new_vertex->add_sink_edges(edge);  // add edge.
+                }
+                sink_vertexes.push_back(*it);
+            } else {
+                // delete those edge.
+            }
+        }
+    }
+
+    // delete all the clus_vertexes.
+    for (auto delete_vertex : clus_vertexes) {
+        removeVertex(delete_vertex);
+    }
+
+    // add the new vertex.
+    this->add_vertex(new_vertex->get_name(), new_vertex);
+}
+
 bool sequentialGraph::makeVertexFusion(sequentialVertex* vertex_1, sequentialVertex* vertex_2, sequentialBase* new_base,
                                        double extra_dist) {
     sequentialVertex* new_vertex = new sequentialVertex(new_base);

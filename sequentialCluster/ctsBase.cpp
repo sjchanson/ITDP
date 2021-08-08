@@ -40,7 +40,7 @@ ClusterVertexPair::ClusterVertexPair(ClusterVertex *v1, ClusterVertex *v2) : Clu
     vertex_1 = v1;
     vertex_2 = v2;
     distance =
-        abs(v1->get_point()->getX() - v2->get_point()->getX()) + abs(v1->get_point()->getY() - v2->get_point()->getY());
+        abs(v1->get_point()->get_x() - v2->get_point()->get_x()) + abs(v1->get_point()->get_y() - v2->get_point()->get_y());
 }
 
 ctsSingleClus::ctsSingleClus() : _name(""), _transition_point_cnt(0), _top_level(0), _root_vertex(nullptr) {}
@@ -218,8 +218,8 @@ std::list<ClusterVertex *> ctsSingleClus::updateUpLevelVertexes(std::list<Cluste
             _vertexes.push_back(v2);
 
             // add transition vertex.
-            DBU x_coord = (v1->get_point()->getX() + v2->get_point()->getX()) / 2;
-            DBU y_coord = (v1->get_point()->getY() + v2->get_point()->getY()) / 2;
+            DBU x_coord = (v1->get_point()->get_x() + v2->get_point()->get_x()) / 2;
+            DBU y_coord = (v1->get_point()->get_y() + v2->get_point()->get_y()) / 2;
             ClusterVertex *transition_vertex = new ClusterVertex(x_coord, y_coord, transition_name);
 
             // make graph.

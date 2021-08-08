@@ -12,6 +12,7 @@
 #include "common/utility.h"
 #include "evaluate.h"
 
+namespace itdp {
 using namespace std;
 
 class runItdp {
@@ -36,7 +37,7 @@ private:
     char** _argv;
     Logger* _log;
     circuit* _circuit;
-    parameter* _para;
+    Parameter* _para;
     sequentialOperator* _opt;
     ctsBase* _base;
     std::vector<string> _pin_name_vec;
@@ -50,3 +51,4 @@ private:
 
     void completePinName();
 };
+}  // namespace itdp

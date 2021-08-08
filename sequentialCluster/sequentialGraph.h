@@ -282,6 +282,8 @@ public:
     bool makeVertexFusion(sequentialVertex* vertex_1, sequentialVertex* vertex_2, sequentialBase* new_base,
                           double extra_dist);
 
+    void makeBatchVertexFusion(std::vector<sequentialVertex*> clus_vertexes, sequentialBase* lcb);
+
     std::unordered_map<std::string, sequentialVertex*> get_vertexes() const { return _vertexes; }
     std::set<sequentialArc*> get_edges() const { return _arcs; }
 

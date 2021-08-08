@@ -24,8 +24,8 @@
 #include <sstream>
 #include <vector>
 
-#include "../Flute/flute.h"
-#include "../library/uit_timer.h"
+#include "Flute/flute.h"
+#include "library/uit_timer.h"
 
 /* density profiling related parms */
 #define BIN_DIM 9.0

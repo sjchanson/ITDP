@@ -17,12 +17,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "evaluate.h"
+#include "../reviseFile/ReviseDEF.h"
+#include "../reviseFile/ReviseVerilog.h"
 #include "common/logger.h"
 #include "common/parameter.h"
 #include "common/utility.h"
-#include "../reviseFile/ReviseDEF.h"
-#include "../reviseFile/ReviseVerilog.h"
+#include "evaluate.h"
 #include "sequentialElement.h"
 #include "sequentialGraph.h"
 

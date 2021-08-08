@@ -1,3 +1,10 @@
+/*
+ * @Author: ShiJian Chen
+ * @Date: 2021-05-16 21:11:14
+ * @LastEditors: Shijian Chen
+ * @LastEditTime: 2021-08-05 14:25:25
+ * @Description:
+ */
 /**
  * @file utility.h
  * @author SJchan (13560469332@163.com)
@@ -25,41 +32,41 @@ typedef long long DBU;
 
 // fun-2
 template <class T>
-
 class Point {
 public:
+    Point() : _x(-1), _y(-1) {}
     Point(T x, T y) : _x(x), _y(y) {}
 
-    T getX() const { return _x; }
-    T getY() const { return _y; }
+    T get_x() const { return _x; }
+    T get_y() const { return _y; }
 
     T computeDist(const Point<T> &other) const {
-        T dx = (getX() > other.getX()) ? (getX() - other.getX()) : (other.getX() - getX());
-        T dy = (getY() > other.getY()) ? (getY() - other.getY()) : (other.getY() - getY());
+        T dx = (get_x() > other.get_x()) ? (get_x() - other.get_x()) : (other.get_x() - get_x());
+        T dy = (get_y() > other.get_y()) ? (get_y() - other.get_y()) : (other.get_y() - get_y());
 
         return dx + dy;
     }
 
     T computeDistX(const Point<T> &other) const {
-        T dx = (getX() > other.getX()) ? (getX() - other.getX()) : (other.getX() - getX());
+        T dx = (get_x() > other.get_x()) ? (get_x() - other.get_x()) : (other.get_x() - get_x());
         return dx;
     }
 
     T computeDistY(const Point<T> &other) const {
-        T dy = (getY() > other.getY()) ? (getY() - other.getY()) : (other.getY() - getY());
+        T dy = (get_y() > other.get_y()) ? (get_y() - other.get_y()) : (other.get_y() - get_y());
         return dy;
     }
 
     bool operator<(const Point<T> &other) const {
-        if (getX() != other.getX()) {
-            return getX() < other.getX();
+        if (get_x() != other.get_x()) {
+            return get_x() < other.get_x();
         } else {
-            return getY() < other.getY();
+            return get_y() < other.get_y();
         }
     }
 
     friend std::ostream &operator<<(std::ostream &out, const Point<T> &point) {
-        out << "[(" << point.getX() << ", " << point.getY() << ")]";
+        out << "[(" << point.get_x() << ", " << point.get_y() << ")]";
         return out;
     }
 
