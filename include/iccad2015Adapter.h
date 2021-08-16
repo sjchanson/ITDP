@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-30 14:20:19
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-04 16:04:09
+ * @LastEditTime: 2021-08-12 12:10:28
  * @Description:
  */
 
@@ -31,13 +31,14 @@ public:
     Iccad2015Adapter(std::shared_ptr<circuit> circuit);
     ~Iccad2015Adapter();
 
-    const std::vector<Instance*> get_instance_pvec() const { return _instance_pvec; }
-    const std::vector<Net*> get_net_pvec() const { return _net_pvec; }
-    const std::vector<Pin*> get_pin_pvec() const { return _pin_pvec; }
+    std::vector<Instance*> get_instance_pvec() const { return _instance_pvec; }
+    std::vector<Net*> get_net_pvec() const { return _net_pvec; }
+    std::vector<Pin*> get_pin_pvec() const { return _pin_pvec; }
 
-    const std::string get_design_name() const { return _design_name; }
-    const double get_core_edge_x() const { return _core_edge_x; }
-    const double get_core_edge_y() const { return _core_edge_y; }
+    std::string get_design_name() const { return _design_name; }
+    double get_core_edge_x() const { return _core_edge_x; }
+    double get_core_edge_y() const { return _core_edge_y; }
+    DBU get_row_height() const { return _row_height; }
 
 private:
     Logger* _log;
@@ -50,6 +51,7 @@ private:
     std::string _design_name;
     double _core_edge_x;
     double _core_edge_y;
+    DBU _row_height;
     // input.
 
     std::shared_ptr<circuit> _circuit;

@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 16:23:00
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-08 19:42:34
+ * @LastEditTime: 2021-08-15 15:47:28
  * @Description:
  */
 
@@ -44,7 +44,9 @@ public:
     void add_pi(SequentialPI* pi) { _pi_map.emplace(pi->get_name(), pi); }
     void add_po(SequentialPO* po) { _po_map.emplace(po->get_name(), po); }
     void add_flipflop(SequentialFlipFlop* flipflop) { _flipflop_map.emplace(flipflop->get_name(), flipflop); }
-    void add_buffer(SequentialBuffer* buffer, std::vector<SequentialElement*> slaves);  // TODO
+    void add_buffer(SequentialBuffer* buffer, std::vector<SequentialElement*> slaves);  
+
+    void resetBelonging();
 
 private:
     std::map<std::string, ClockTree*> _clock_tree;

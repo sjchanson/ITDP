@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:51:11
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-08 19:48:02
+ * @LastEditTime: 2021-08-16 13:14:01
  * @Description:
  */
 
@@ -114,6 +114,56 @@ SequentialBuffer* SequentialBase::get_sequential_buffer(std::string name) const 
     } else {
         return (*iter).second;
     }
+}
+
+/**
+ * @description: Reset the cluster.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialBase::resetBelonging() {
+    for (auto pair : _flipflop_map) {
+        auto flipflop = pair.second;
+        flipflop->resetCluster();
+    }
+    for (auto pair : _buffer_map) {
+        auto buffer = pair.second;
+        buffer->resetCluster();
+    }
+}
+
+/**
+ * @description: Set the clock tree connection.
+ * @param {SequentialBuffer*} buffer
+ * @param {vector<SequentialElement*>} slaves
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialBase::add_buffer(SequentialBuffer* buffer, std::vector<SequentialElement*> slaves) {
+    _buffer_map.emplace(buffer->get_name(), buffer);
+    ClockNode* master = new ClockNode(buffer);
+
+    for (auto slave : slaves) {
+        ClockNode* slave_node;
+        auto it = _clock_tree.find(slave->get_name());
+        if (it != _clock_tree.end()) {
+            ClockTree* tree = (*it).second;
+            slave_node = tree->get_root();
+            // delete the clock tree.
+            delete tree;
+            _clock_tree.erase(it);
+        } else {
+            slave_node = new ClockNode(slave);
+        }
+        slave_node->set_master(master);
+        _tree_nodes.push_back(slave_node);
+        master->add_slave(slave_node);
+    }
+
+    _tree_nodes.push_back(master);
+    ClockTree* master_tree = new ClockTree(master);
+    _clock_tree.emplace(buffer->get_name(), master_tree);
 }
 
 }  // namespace itdp

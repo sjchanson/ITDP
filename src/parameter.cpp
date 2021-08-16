@@ -1,3 +1,10 @@
+/*
+ * @Author: ShiJian Chen
+ * @Date: 2021-07-14 14:37:40
+ * @LastEditors: Shijian Chen
+ * @LastEditTime: 2021-08-12 14:35:03
+ * @Description:
+ */
 #include "common/parameter.h"
 
 namespace itdp {
@@ -15,6 +22,7 @@ Parameter::Parameter()
     , _modify_prefix("modify_")
     , _core_x(0)
     , _core_y(0)
-    , _max_required_skew(0.0) {}
+    , _max_required_skew(0.0)
+    , _row_height(0) {}
 
 }  // namespace itdp

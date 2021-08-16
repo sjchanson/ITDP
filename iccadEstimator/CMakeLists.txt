@@ -9,7 +9,7 @@ set(CMAKE_BUILD_TYPE "Debug")
 
 # Compile options
 if(CMAKE_COMPILER_IS_GNUCXX)
-    add_compile_options(-std=c++11 -Wall -O3 -fopenmp)
+    add_compile_options(-std=c++17 -Wall -O3 -fopenmp)
 else()
     message(FATAL_ERROR "G++ NOT FOUND")
 endif()

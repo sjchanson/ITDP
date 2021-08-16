@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-14 14:37:40
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-01 17:19:50
+ * @LastEditTime: 2021-08-09 11:57:52
  * @Description:
  */
 /**
@@ -30,7 +30,7 @@ public:
     }
 
     // Print functions
-    void displayTitle(int argc, char** argv, int verbose);
+    void displayTitle(int verbose);
 
     void programBegin(std::string input, int verbose);
     void programEnd(std::string input, int verbose);

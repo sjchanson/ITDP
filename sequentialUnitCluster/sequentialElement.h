@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-01 20:11:31
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-07 14:51:40
+ * @LastEditTime: 2021-08-15 15:41:18
  * @Description:
  */
 
@@ -107,9 +107,14 @@ public:
 
     // getter.
     const Instance* get_instance() const { return _flipflop_inst; }
+    const Pin* get_data_input_pin() const { return _data_input_pin; }
+
+    // be careful of get_cluster.
 
     // setter.
     void set_cluster(SequentialElement* cluster) { _cluster = cluster; }
+
+    void resetCluster() { _cluster = nullptr; }
 
 private:
     Pin* _data_input_pin;
@@ -137,11 +142,14 @@ public:
     SequentialCluster(std::string name);
     ~SequentialCluster() = default;
 
+    // getter.
+    int get_sub_size() const { return _sub_element_map.size(); }
     SequentialElement* get_sub_element(std::string name) const;
     std::vector<SequentialElement*> get_all_element_vec() const;
 
-    void set_center_coord() {}  // TODO.
-    void addSubElement(SequentialElement* f) { _sub_element_map.emplace(f->get_name(), f); }
+    // setter.
+    void addSubElement(SequentialElement* element);
+    void set_name(std::string name) { _name = name; }
 
 private:
     std::map<std::string, SequentialElement*> _sub_element_map;
@@ -149,7 +157,6 @@ private:
 inline SequentialCluster::SequentialCluster(std::string name) {
     _name = name;
     _type = 5;
-    set_center_coord();
 }
 inline SequentialElement* SequentialCluster::get_sub_element(std::string name) const {
     auto iter = _sub_element_map.find(name);
@@ -166,6 +173,15 @@ inline std::vector<SequentialElement*> SequentialCluster::get_all_element_vec() 
     }
     return element_vec;
 }
+inline void SequentialCluster::addSubElement(SequentialElement* element) {
+    int x_sum = get_coord().get_x() * _sub_element_map.size();
+    int y_sum = get_coord().get_y() * _sub_element_map.size();
+    _sub_element_map.emplace(element->get_name(), element);
+
+    int x_coord = (x_sum + element->get_coord().get_x()) / _sub_element_map.size();
+    int y_coord = (y_sum + element->get_coord().get_y()) / _sub_element_map.size();
+    _coordinate = Point<DBU>(x_coord, y_coord);
+}
 
 class SequentialBuffer : public SequentialElement {
 public:
@@ -176,6 +192,8 @@ public:
     // setter.
     void set_cluster(SequentialElement* cluster) { _cluster = cluster; }
     void set_center_coord() {}  // TODO.
+
+    void resetCluster() { _cluster = nullptr; }
 
 private:
     // Pin* _clock_input_pin;

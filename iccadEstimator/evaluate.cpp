@@ -37,8 +37,8 @@ bool circuit::measure_timing() {
     strcpy(arguments[1], (filename + ".tau2015").c_str());
     strcpy(arguments[2], (filename + ".timing").c_str());
 
-    string path = getcwd(NULL, 0);
-    std::cout << path << std::endl;
+    // string path = getcwd(NULL, 0);
+    // std::cout << path << std::endl;
 
     using namespace uit;
     // Timer timer;

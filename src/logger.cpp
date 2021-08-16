@@ -1,3 +1,10 @@
+/*
+ * @Author: ShiJian Chen
+ * @Date: 2021-07-14 14:37:40
+ * @LastEditors: Shijian Chen
+ * @LastEditTime: 2021-08-09 11:57:34
+ * @Description:
+ */
 #include "common/logger.h"
 
 #include <cstdlib>
@@ -16,21 +23,12 @@ using std::string;
 Logger::Logger(string name, int verbose) : _verbose(verbose), _name(name) {}
 
 // Procedure title
-void Logger::displayTitle(int argc, char** argv, int verbose) {
+void Logger::displayTitle(int verbose) {
     VERBOSE_CHECK()
     cout << "================================================================================" << endl;
     cout << "    ICCAD 2015 Incremental Timing-Driven Placement Contest Improvement Script    " << endl;
     cout << "    Authors : ChenShiJian 13560469332@163.com    " << endl;
     cout << "================================================================================" << endl;
-
-    if (argc < 3 || argc > 4) {
-        cout << "Incorrect arguments. exiting .." << endl;
-        cout << "Usage : iTDPlacer ICCAD15.parm [.iccad2015] (optional)[final.ops]" << endl;
-    }
-
-    cout << "Command line : " << endl;
-    for (int i = 0; i < argc; i++) cout << " " << argv[i];
-    cout << endl;
 }
 
 void Logger::error(std::string input, int code, int verbose) {

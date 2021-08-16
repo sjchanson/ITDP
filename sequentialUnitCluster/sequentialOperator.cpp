@@ -2,13 +2,59 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:57:39
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-08 22:07:31
+ * @LastEditTime: 2021-08-16 16:33:04
  * @Description:
  */
 
 #include "sequentialOperator.h"
 
 #include <math.h>
+
+namespace itdp {
+class ProcessData {
+public:
+    ProcessData() = default;
+    ~ProcessData();
+
+    // getter.
+    int get_logic_size() const { return _logic_map.size(); }
+    bool isInstanceAccessed(std::string name);
+    bool isFlipflopAccessed(std::string name);
+    SequentialLogic* get_sequential_logic(std::string name) const;
+
+    // setter.
+    void add_accessed_instance(std::string name) { _instance_visited_record.emplace(name); }
+    void add_accessed_flipflop(std::string name) { _flipflop_visited_record.emplace(name); }
+    void add_logic_map(SequentialLogic* logic) { _logic_map.emplace(logic->get_name(), logic); }
+
+private:
+    std::set<std::string> _instance_visited_record;
+    std::set<std::string> _flipflop_visited_record;
+    std::map<std::string, SequentialLogic*> _logic_map;
+};
+inline ProcessData::~ProcessData() {
+    _instance_visited_record.clear();
+    _flipflop_visited_record.clear();
+    for (auto logic : _logic_map) {
+        delete logic.second;
+    }
+    _logic_map.clear();
+}
+inline bool ProcessData::isInstanceAccessed(std::string name) {
+    return _instance_visited_record.find(name) != _instance_visited_record.end();
+}
+inline bool ProcessData::isFlipflopAccessed(std::string name) {
+    return _flipflop_visited_record.find(name) != _flipflop_visited_record.end();
+}
+inline SequentialLogic* ProcessData::get_sequential_logic(std::string name) const {
+    auto iter = _logic_map.find(name);
+    if (iter == _logic_map.end()) {
+        return nullptr;
+    } else {
+        return (*iter).second;
+    }
+}
+}  // namespace itdp
 
 namespace itdp {
 
@@ -18,6 +64,10 @@ SequentialOperator::SequentialOperator(AdapterInterface* data_interface) {
     _skew_constraint_graph = new SkewConstraintGraph("origin");
     _log = Logger::get_logger_obj("xxx", 0);
     _parameter = Parameter::get_parameter_pointer();
+    _parameter->set_core_x(data_interface->get_core_edge_x());
+    _parameter->set_core_y(data_interface->get_core_edge_y());
+    _parameter->set_row_height(data_interface->get_row_height());
+    _max_required_skew = 0;
     init();
 }
 
@@ -26,7 +76,25 @@ SequentialOperator::~SequentialOperator() {
     delete _skew_constraint_graph;
 }
 
-void SequentialOperator::cleanClusters() { clusters_map.clear(); }
+/**
+ * @description: Run the SubGraphPartition version.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialOperator::subSequentialClusterSolve() {
+    _skew_constraint_graph->subgraphPartition(_parameter->get_clus_size());
+}
+
+/**
+ * @description: Clean the exist clusters.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialOperator::cleanClusters() { _clusters_map.clear(); }
+
+void SequentialOperator::initDistanceMatrix() { _skew_constraint_graph->initDistanceMatrix(); }
 
 /**
  * @description: Init the sequential element and sequential graph.
@@ -77,6 +145,12 @@ void SequentialOperator::init() {
         }
     }
 
+    // set the max required skew.
+    _parameter->set_max_required_skew(_max_required_skew);
+
+    _skew_constraint_graph->initReachableVertexes();
+    _skew_constraint_graph->initRegion();
+
     // print the circuit info.
     _log->printInt("Sequential PI", _sequential_base->get_sequential_pi_size(), 1);
     _log->printInt("Sequential PO", _sequential_base->get_sequential_po_size(), 1);
@@ -86,6 +160,18 @@ void SequentialOperator::init() {
     _log->printInt("Sequential Edges", _skew_constraint_graph->get_sequential_edges_size(), 1);
 
     delete process_data;
+}
+
+/**
+ * @description: select the max skew to normalize.
+ * @param {double} skew
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialOperator::add_max_required_skew(double skew) {
+    if (skew > _max_required_skew) {
+        _max_required_skew = skew;
+    }
 }
 
 /**
@@ -100,40 +186,6 @@ void SequentialOperator::ergodicGenerateGraph(std::stack<SequentialElement*>& st
         _log->error("There are no elements in the current stack", 1, 0);
     }
     SequentialElement* current_element = stack.top();
-
-    // Termination conditions.
-    if (current_element->isPo()) {
-        // Add graph vertices and edges.
-        std::vector<SequentialElement*> elements = {current_element};
-        addSequentialGraph(elements, stack);
-        stack.pop();
-        return;
-    }
-    if (process_data->isInstanceAccessed(current_element->get_name())) {
-        if (current_element->isFlipFlop()) {
-            // Add graph vertices and edges.
-            std::vector<SequentialElement*> elements = {current_element};
-            addSequentialGraph(elements, stack);
-        } else if (current_element->isLogic()) {
-            // Add graph vertices and edges.
-            auto current_logic = dynamic_cast<SequentialLogic*>(current_element);
-            std::vector<SequentialElement*> elements = current_logic->get_accessible_elements();
-            if (!elements.empty()) {  // logic has no flipflop connection.
-                addSequentialGraph(elements, stack);
-            }
-        } else {
-            // PI/PO case is impossible.
-        }
-        stack.pop();
-        return;
-    }
-    // Instance already accessed by the current path.
-    if (accessed_instance.find(current_element->get_name()) != accessed_instance.end()) {
-        stack.pop();
-        return;
-    }
-    accessed_instance.emplace(current_element->get_name());
-
     std::vector<Pin*> sink_pins;  // pins of net's load.
     obtainSinkPins(current_element, sink_pins);
     // for those instances have no output.
@@ -148,39 +200,63 @@ void SequentialOperator::ergodicGenerateGraph(std::stack<SequentialElement*>& st
     }
     // Handle the sink elements of sink pins.
     for (Pin* sink_pin : sink_pins) {
-        SequentialElement* sink_element =
-            addSequentialElement(sink_pin, current_element, stack, accessed_instance, process_data);
-        if (sink_element == nullptr) {
-            _log->error(sink_pin->get_name() + " doesn't belong to an instance", 1, 0);
-        } else {
-            if (sink_element->isPo() && current_element->isLogic()) {
+        SequentialElement* sink_element = addSequentialElement(sink_pin, current_element, process_data);
+        // Termination conditions.
+        if (sink_element->isPo()) {
+            // Add graph vertices and edges.
+            std::vector<SequentialElement*> elements = {sink_element};
+            addSequentialGraph(elements, stack);
+            if (current_element->isLogic()) {
                 SequentialLogic* logic_element = dynamic_cast<SequentialLogic*>(current_element);
                 logic_element->add_accessible_element(sink_element);
             }
+            continue;
         }
-
+        if (process_data->isInstanceAccessed(sink_element->get_name())) {
+            if (sink_element->isFlipFlop()) {
+                // Add graph vertices and edges.
+                std::vector<SequentialElement*> elements = {sink_element};
+                addSequentialGraph(elements, stack);
+            } else if (sink_element->isLogic()) {
+                // Add graph vertices and edges.
+                auto sink_logic = dynamic_cast<SequentialLogic*>(sink_element);
+                std::vector<SequentialElement*> elements = sink_logic->get_accessible_elements();
+                if (!elements.empty()) {  // logic has no flipflop connection.
+                    addSequentialGraph(elements, stack);
+                }
+            } else {
+                // PI/PO case is impossible.
+            }
+            continue;
+        }
+        // Instance already accessed by the current path.
+        if (accessed_instance.find(sink_element->get_name()) != accessed_instance.end()) {
+            continue;
+        }
+        accessed_instance.emplace(sink_element->get_name());
+        stack.push(sink_element);
         // next recursive.
         ergodicGenerateGraph(stack, accessed_instance, process_data);
         // backtraking.
-        if (current_element->isFlipFlop() || current_element->isLogic()) {
-            if (current_element->isFlipFlop()) {
-                // Add graph vertices and edges.
-                std::vector<SequentialElement*> elements = {current_element};
-                addSequentialGraph(elements, stack);
-                // add accessible instance.
-            } else {
-                if (sink_element->isFlipFlop()) {
-                    SequentialLogic* current_logic = dynamic_cast<SequentialLogic*>(current_element);
-                    current_logic->add_accessible_element(sink_element);
-                }
-                if (sink_element->isLogic()) {
-                    SequentialLogic* current_logic = dynamic_cast<SequentialLogic*>(current_element);
-                    SequentialLogic* sink_logic = dynamic_cast<SequentialLogic*>(sink_element);
-                    current_logic->add_batch_elements(sink_logic->get_accessible_elements());
-                }
+        if (sink_element->isFlipFlop()) {
+            // Add graph vertices and edges.
+            std::vector<SequentialElement*> elements = {sink_element};
+            addSequentialGraph(elements, stack);
+            if (current_element->isLogic()) {
+                SequentialLogic* current_logic = dynamic_cast<SequentialLogic*>(current_element);
+                current_logic->add_accessible_element(sink_element);
             }
-            process_data->add_accessed_instance(current_element->get_name());
+            // add accessible instance.
+        } else if (sink_element->isLogic()) {
+            if (current_element->isLogic()) {
+                SequentialLogic* current_logic = dynamic_cast<SequentialLogic*>(current_element);
+                SequentialLogic* sink_logic = dynamic_cast<SequentialLogic*>(sink_element);
+                current_logic->add_batch_elements(sink_logic->get_accessible_elements());
+            }
+        } else {
+            //
         }
+        process_data->add_accessed_instance(current_element->get_name());
     }
     stack.pop();
 }
@@ -192,19 +268,14 @@ void SequentialOperator::ergodicGenerateGraph(std::stack<SequentialElement*>& st
  * @author: ShiJian Chen
  */
 SequentialElement* SequentialOperator::addSequentialElement(Pin* sink_pin, SequentialElement* src_element,
-                                                            std::stack<SequentialElement*>& stack,
-                                                            std::set<std::string>& accessed_instance,
                                                             ProcessData* process_data) {
     SequentialElement* sink_element;
     if (sink_pin->isPO()) {
         SequentialPO* sink_po = _sequential_base->get_sequential_po(sink_pin->get_name());
         if (!sink_po) {
             sink_po = new SequentialPO(sink_pin);
-            // add skew to the sequential po.
-            sink_po->add_name_to_skew(src_element->get_name(), calculateSetupSkew(sink_pin));
             _sequential_base->add_po(sink_po);
         }
-        stack.push(sink_po);
         sink_element = sink_po;
         return sink_element;
     } else {
@@ -214,12 +285,10 @@ SequentialElement* SequentialOperator::addSequentialElement(Pin* sink_pin, Seque
             SequentialFlipFlop* sink_flipflop = _sequential_base->get_sequential_flipflop(sink_instance->get_name());
             if (!sink_flipflop) {
                 sink_flipflop = new SequentialFlipFlop(sink_instance);
-                // add skew to the sequential flipflop.
-                sink_flipflop->add_name_to_skew(src_element->get_name(), calculateSetupSkew(sink_pin));
+
                 _sequential_base->add_flipflop(sink_flipflop);
                 process_data->add_accessed_flipflop(sink_instance->get_name());
             }
-            stack.push(sink_flipflop);
             sink_element = sink_flipflop;
         } else {
             SequentialLogic* sink_logic = process_data->get_sequential_logic(sink_instance->get_name());
@@ -227,7 +296,6 @@ SequentialElement* SequentialOperator::addSequentialElement(Pin* sink_pin, Seque
                 sink_logic = new SequentialLogic(sink_instance);
                 process_data->add_logic_map(sink_logic);
             }
-            stack.push(sink_logic);
             sink_element = sink_logic;
         }
         return sink_element;
@@ -265,8 +333,6 @@ void SequentialOperator::addSequentialGraph(std::vector<SequentialElement*> sink
         _log->warn("Duplicate stack is empty when addSequentialGraph", 1, 0);
     }
 
-    duplicate_stack.pop();  // pop the current element so that find the source element.
-
     // find the source_element(pi/flipflop).
     while (!duplicate_stack.empty()) {
         SequentialElement* source_element = duplicate_stack.top();
@@ -293,6 +359,26 @@ void SequentialOperator::addSequentialGraph(std::vector<SequentialElement*> sink
 void SequentialOperator::addVertexes(std::vector<SequentialElement*> sink_elements, SequentialElement* source_element) {
     bool existence_flag1, existence_flag2;
     for (auto sink : sink_elements) {
+        // add skew to the sequential flipflop.
+        if (sink->isFlipFlop()) {
+            SequentialFlipFlop* sink_flipflop = static_cast<SequentialFlipFlop*>(sink);
+            double skew = calculateSetupSkew(sink_flipflop->get_data_input_pin());
+            // max required skew used for flipflop cluster.
+            add_max_required_skew(skew);
+            sink_flipflop->add_name_to_skew(source_element->get_name(), skew);
+        }
+        // add skew to the sequential po.
+        if (sink->isPo()) {
+            SequentialPO* sink_po = static_cast<SequentialPO*>(sink);
+            double skew = calculateSetupSkew(sink_po->get_pin());
+            sink_po->add_name_to_skew(source_element->get_name(), skew);
+        }
+
+        // if the sink is itself
+        if (sink->get_name() == source_element->get_name()) {
+            continue;
+        }
+
         SequentialVertex* source_vertex = _skew_constraint_graph->get_existent_vertex(source_element->get_name());
         source_vertex == nullptr ? existence_flag1 = false : existence_flag1 = true;
         if (!existence_flag1) {
@@ -307,7 +393,7 @@ void SequentialOperator::addVertexes(std::vector<SequentialElement*> sink_elemen
             _skew_constraint_graph->add_sequential_vertex(sink_vertex);
         }
 
-        if (existence_flag1 || existence_flag2) {
+        if (!existence_flag1 || !existence_flag2) {
             SequentialEdge* edge = new SequentialEdge(source_vertex, sink_vertex);
             _skew_constraint_graph->add_sequential_edge(edge);
             source_vertex->add_sink_edge(edge);
@@ -353,5 +439,42 @@ void SequentialOperator::obtainSinkPins(SequentialElement* element, std::vector<
         _log->error("Break traversal. Element: " + element->get_name(), 1, 0);
     }
 }
+
+/**
+ * @description: Finish the sequential cluster.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialOperator::sequentialClusterSolve() {
+    cleanClusters();
+    _clusters_map = _skew_constraint_graph->makeVertexesFusion();
+
+    // reset the sink element's belonging.
+    _sequential_base->resetBelonging();
+
+    // build the clockTree.
+    for (auto pair : _clusters_map) {
+        std::string name = pair.first;
+        auto element_vec = pair.second;
+
+        SequentialBuffer* buffer = new SequentialBuffer(name);
+        _sequential_base->add_buffer(buffer, element_vec);
+    }
+}
+
+// std::vector<std::vector<ClusterVertex*>> SequentialOperator::obtainPerfectBinaryTree() {
+//     std::vector<ClusterVertex*> vertexes;
+//     std::vector<std::vector<ClusterVertex*>> perfect_trees;
+//     for (auto pair : _clusters_map) {
+//         std::string buffer_name = pair.first;
+//         std::vector<SequentialElement*> remain_elements = pair.second;
+//         std::vector<ClusterVertex*> perfect_binary_tree;
+//         std::vector<std::pair<ClusterVertex*, ClusterVertex*>> binary_pairs;
+
+//         makeBinaryPair(remain_elements, binary_pairs);  // TODO.
+//         //
+//     }
+// }
 
 }  // namespace itdp

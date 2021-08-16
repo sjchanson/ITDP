@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-31 16:51:45
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-08 21:14:42
+ * @LastEditTime: 2021-08-12 14:39:34
  * @Description:
  */
 
@@ -12,11 +12,12 @@ namespace itdp {
 
 Iccad2015Adapter::Iccad2015Adapter(std::shared_ptr<circuit> circuit) {
     _log = Logger::get_logger_obj("xxx", 0);
+    _log->displayTitle(0);
     _circuit = circuit;
     _design_name = circuit->get_design_name();
     _core_edge_x = circuit->get_rx() - circuit->get_lx();
     _core_edge_y = circuit->get_ty() - circuit->get_by();
-
+    _row_height = static_cast<DBU>(circuit->get_row_height());
     dataTransmit();
 }
 

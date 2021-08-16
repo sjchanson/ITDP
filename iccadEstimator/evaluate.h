@@ -390,6 +390,9 @@ public:
     /* design name getter */
     std::string get_design_name() const { return design_name; }
 
+    /* design area getter */
+    double get_row_height() const { return rowHeight; }
+
     /* benchmark generation */
     string benchmark; /* benchmark name */
     string final_ops;

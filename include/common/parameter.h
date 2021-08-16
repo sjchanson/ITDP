@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-14 14:37:40
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-07 14:32:24
+ * @LastEditTime: 2021-08-12 14:30:05
  * @Description:
  */
 /**
@@ -29,6 +29,7 @@ public:
 
     void set_core_x(int x) { _core_x = x; }
     void set_core_y(int y) { _core_y = y; }
+    void set_row_height(int row_height) { _row_height = row_height; }
     void set_max_required_skew(double skew) { _max_required_skew = skew; }
 
     bool isCoreXLegal() const { return _core_x != 0; }
@@ -48,6 +49,7 @@ public:
     int get_core_x() const { return _core_x; }
     int get_core_y() const { return _core_y; }
     double get_max_required_skew() const { return _max_required_skew; }
+    int get_row_height() const { return _row_height; }
 
 private:
     static std::shared_ptr<Parameter> _para;
@@ -70,6 +72,7 @@ private:
     int _core_x;
     int _core_y;
     double _max_required_skew;
+    int _row_height;
 };
 
 inline std::shared_ptr<Parameter> Parameter::_para(new Parameter(), Parameter::destroyParameter);
