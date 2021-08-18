@@ -84,6 +84,15 @@ bool circuit::measure_timing() {
                 min(timer.report_slack(thePin->name, LATE, RISE), timer.report_slack(thePin->name, LATE, FALL));
         }
 
+        // sjchen modify.
+        // if (thePin->isFlopCkPort) {
+        //     timer.set_at(thePin->name, EARLY, RISE, 100);
+        //     timer.set_at(thePin->name, EARLY, FALL, 100);
+        //     timer.set_at(thePin->name, LATE, RISE, 100);
+        //     timer.set_at(thePin->name, LATE, FALL, 100);
+        //     timer.update_timing();
+        // }
+
         // collect slacks @ timing end points
         if (thePin->type == PO_PIN || (thePin->isFlopInput && !thePin->isFlopCkPort)) {
 #ifdef DEBUG

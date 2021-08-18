@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 11:57:29
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 15:09:49
+ * @LastEditTime: 2021-08-16 16:41:13
  * @Description:
  */
 
@@ -16,7 +16,6 @@
 #include <string>
 #include <vector>
 
-#include "../DME/DME.h"
 #include "../include/common/logger.h"
 #include "../include/common/parameter.h"
 #include "../include/common/utility.h"
@@ -40,7 +39,7 @@ public:
     double get_max_required_skew() const { return _max_required_skew; }
 
     void buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map) {}  // TODO : Top-level Operations.
-    std::vector<std::vector<ClusterVertex*>> obtainPerfectBinaryTree();
+    // std::vector<std::vector<ClusterVertex*>> obtainPerfectBinaryTree();
 
     void subSequentialClusterSolve();
 
@@ -72,8 +71,8 @@ private:
     void addVertexes(std::vector<SequentialElement*> sink_elements, SequentialElement* source_element);
 
     // perfect binary tree.
-    void makeBinaryPair(std::vector<SequentialElement*>& remain_elements,
-                        std::vector<std::pair<ClusterVertex*, ClusterVertex*>>& binary_pairs);
+    // void makeBinaryPair(std::vector<SequentialElement*>& remain_elements,
+    //                     std::vector<std::pair<ClusterVertex*, ClusterVertex*>>& binary_pairs);
 };
 
 }  // namespace itdp

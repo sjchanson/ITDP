@@ -15,60 +15,14 @@
 #include <string>
 #include <vector>
 
+#include "../include/common/utility.h"
+
 using namespace std;
-
-using DBU = long long;
-
-// fun-2
-template <class T>
-class Point {
-public:
-    Point(T x, T y) : _x(x), _y(y) {}
-
-    T get_x() const { return _x; }
-    T get_y() const { return _y; }
-
-    T computeDist(const Point<T> &other) const {
-        T dx = (get_x() > other.get_x()) ? (get_x() - other.get_x()) : (other.get_x() - get_x());
-        T dy = (get_y() > other.get_y()) ? (get_y() - other.get_y()) : (other.get_y() - get_y());
-
-        return dx + dy;
-    }
-
-    T computeDistX(const Point<T> &other) const {
-        T dx = (get_x() > other.get_x()) ? (get_x() - other.get_x()) : (other.get_x() - get_x());
-        return dx;
-    }
-
-    T computeDistY(const Point<T> &other) const {
-        T dy = (get_y() > other.get_y()) ? (get_y() - other.get_y()) : (other.get_y() - get_y());
-        return dy;
-    }
-
-    bool operator<(const Point<T> &other) const {
-        if (get_x() != other.get_x()) {
-            return get_x() < other.get_x();
-        } else {
-            return get_y() < other.get_y();
-        }
-    }
-
-    friend ostream &operator<<(ostream &out, const Point<T> &point) {
-        out << "[(" << point.get_x() << ", " << point.get_y() << ")]";
-        return out;
-    }
-
-    bool isLegalPoint() const { return _x != -1 && _y != -1; }
-
-private:
-    T _x;
-    T _y;
-};
 
 class ClusterVertex {
 public:
     ClusterVertex() = default;
-    ClusterVertex(Point<DBU> *point, string name) : ClusterVertex() {
+    ClusterVertex(Point<DBU> point, string name) : ClusterVertex() {
         _point = point;
         _name = name;
     };
@@ -80,7 +34,7 @@ public:
     //   };
     ~ClusterVertex() = default;
 
-    bool isLegal() { return _point->isLegalPoint(); }
+    bool isUnLegal() { return _point.isUnLegal(); }
     bool isSink() {
         if (_name.size() <= 2) {
             return false;
@@ -103,18 +57,18 @@ public:
         return suffix_name == "BUF";
     }
     // get
-    Point<DBU> *get_point() const { return _point; }
+    Point<DBU> get_point() const { return _point; }
     double get_skew() const { return _skew; }
     string get_name() const { return _name; }
     // set
-    void set_point(Point<DBU> *point) { _point = point; }
+    void set_point(Point<DBU> point) { _point = point; }
     void set_skew(const double skew) { _skew = skew; }
     void set_name(const string name) { _name = name; }
 
 private:
     string _name = "";
-    Point<DBU> *_point;  // loaction.
-    double _skew = 0;    // left -> right.
+    Point<DBU> _point;  // loaction.
+    double _skew = 0;   // left -> right.
 };
 
 using ClusterTopo = vector<ClusterVertex *>;

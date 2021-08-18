@@ -2,10 +2,11 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-16 15:42:30
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 16:25:38
+ * @LastEditTime: 2021-08-18 11:33:16
  * @Description:
  */
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -26,6 +27,16 @@ inline ClusterVertexPair::ClusterVertexPair(ClusterVertex* v1, ClusterVertex* v2
     distance = dist;
 }
 
+struct ClusterNode {
+    ClusterNode(ClusterVertex* v);
+    int level;
+    ClusterVertex* vertex;
+    ClusterNode* parent;
+    ClusterNode* left_child;
+    ClusterNode* right_child;
+};
+inline ClusterNode::ClusterNode(ClusterVertex* v) { vertex = v; }
+
 class SingleCluster {
 public:
     SingleCluster() = delete;
@@ -35,12 +46,15 @@ public:
     void makeBinaryPair();
 
     ClusterVertex* makeClusterVertex(std::string name, Point<DBU> point);
+    ClusterNode* makeClusterNode(ClusterVertex* vertex);
+    void updateVertexFusion(ClusterVertex* v1, ClusterVertex* v2, double skew, int level);
 
 private:
     std::vector<const itdp::SequentialElement*> _origin_elements;
     std::vector<const itdp::SequentialElement*> _remain_elements;
 
     std::map<std::string, ClusterVertex*> _vertexes;
+    std::map<std::string, ClusterNode*> _nodes;
     std::vector<ClusterVertex*> _perfect_binary_trees;
     std::vector<ClusterVertexPair> _binary_pairs;
 };
