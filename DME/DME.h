@@ -34,7 +34,7 @@ public:
     //   };
     ~ClusterVertex() = default;
 
-    bool isUnLegal() { return _point.isUnLegal(); }
+    bool isLegal() { return !_point.isUnLegal(); }
     bool isSink() {
         if (_name.size() <= 2) {
             return false;
@@ -67,12 +67,12 @@ public:
 
 private:
     string _name = "";
-    Point<DBU> _point;  // loaction.
-    double _skew = 0;   // left -> right.
+    Point<DBU> _point = Point<DBU>(-1, -1);  // loaction.
+    double _skew = 0;                        // left -> right.
 };
 
 using ClusterTopo = vector<ClusterVertex *>;
-using MergeSegment = pair<Point<DBU> *, Point<DBU> *>;
+using MergeSegment = pair<Point<DBU>, Point<DBU>>;
 using WireSegment = deque<Point<DBU>>;
 
 class DME {
@@ -81,9 +81,11 @@ public:
      * @brief For a single cluster compute center location
      *
      * @param binary_tree
-     * @param lcb_name
+     * @param buffer_name
      */
-    void computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string &lcb_name);
+
+    void computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string &buffer_name,
+                                        const unsigned &buffer_site_width);
 
 private:
     /**
@@ -93,11 +95,12 @@ private:
      * @param ms2
      * @param cluster_center
      * @param buffer_name
+     * @param is_buffer
      * @return Point<DBU>*
      */
 
-    Point<DBU> *computeMergePoint(const MergeSegment &ms1, const MergeSegment &ms2, const Point<DBU> *cluster_center,
-                                  const string &buffer_name) const;
+    Point<DBU> computeMergePoint(const MergeSegment &ms1, const MergeSegment &ms2, const Point<DBU> &cluster_center,
+                                 const string &buffer_name, const bool &is_buffer) const;
 
     /**
      * @brief Convert skew to distance(the cap and the res should be
@@ -111,5 +114,5 @@ private:
      */
 
     DBU skewToDistance(const ClusterVertex *left_point, const ClusterVertex *right_point,
-                       const Point<DBU> *geometric_center, const double &skew);
+                       const Point<DBU> &geometric_center, const double &skew) const;
 };

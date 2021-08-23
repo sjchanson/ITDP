@@ -2,13 +2,15 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 11:04:27
+ * @LastEditTime: 2021-08-22 17:13:23
  * @Description:
  */
 
 #include "skewConstraintGraph.h"
 
 #include <limits.h>
+
+#include "omp.h"
 
 struct SubCluster {
     SubCluster(int id) { idx = id; }
@@ -29,7 +31,7 @@ bool compareSequentialVertexPtrLess(const itdp::SequentialVertex* v1, const itdp
 }
 
 bool compareSequentialVertexPtrEqual(const itdp::SequentialVertex* v1, const itdp::SequentialVertex* v2) {
-    return v1->get_name() < v2->get_name();
+    return v1->get_name() == v2->get_name();
 }
 
 bool sequentialEdgeCMP(const itdp::SequentialEdge* e1, const itdp::SequentialEdge* e2) {
@@ -50,30 +52,53 @@ SequentialVertex::SequentialVertex(SequentialElement* node) : _is_start(0), _is_
 }
 
 /**
- * @description: add the batch descndants in the special order.
+ * @description: add the descendant, prevent to repeat add.
+ * @param {SequentialVertex*} v
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialVertex::add_descendant(SequentialVertex* v) {
+    bool is_exist = std::find_if(_descendants.begin(), _descendants.end(), [v](const SequentialVertex* descendant) {
+                        return *v == *descendant;
+                    }) != _descendants.end();
+    if (is_exist) {
+        return;
+    } else {
+        _descendants.push_back(v);
+    }
+}
+
+/**
+ * @description: add the batch descndants.
  * @param {list<SequentialVertex*>} batch
  * @return {*}
  * @author: ShiJian Chen
  */
 void SequentialVertex::add_batch_descendants(std::list<SequentialVertex*> batch) {
-    // need to keep the order of descendants.
-    std::stack<SequentialVertex*> stack;
-    for (auto iter = batch.rbegin(); iter != batch.rend(); iter++) {
-        auto current_vertex = *iter;
+    // sort by address.
+    _descendants.sort(compareSequentialVertexPtrLess);
+    batch.sort(compareSequentialVertexPtrLess);
 
-        // TODO : Is there another way to avoid this situation?
-        bool is_exist = std::find_if(_descendants.begin(), _descendants.end(),
-                                     [current_vertex](const SequentialVertex* v) { return *current_vertex == *v; }) !=
-                        _descendants.end();
-        if (is_exist) {
-            break;
-        } else {
-            stack.push(current_vertex);
-        }
-    }
-    while (!stack.empty()) {
-        add_descendant(stack.top());
-        stack.pop();
+    std::list<SequentialVertex*> new_list;
+    std::set_difference(batch.begin(), batch.end(), _descendants.begin(), _descendants.end(),
+                        std::back_inserter(new_list), compareSequentialVertexPtrLess);
+
+    _descendants.merge(new_list);
+}
+
+/**
+ * @description: add the ancestor, prevent to repeat add.
+ * @param {SequentialVertex*} v
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialVertex::add_ancestor(SequentialVertex* v) {
+    bool is_exist = std::find_if(_ancestors.begin(), _ancestors.end(),
+                                 [v](const SequentialVertex* ancestor) { return *v == *ancestor; }) != _ancestors.end();
+    if (is_exist) {
+        return;
+    } else {
+        _ancestors.push_back(v);
     }
 }
 
@@ -84,25 +109,15 @@ void SequentialVertex::add_batch_descendants(std::list<SequentialVertex*> batch)
  * @author: ShiJian Chen
  */
 void SequentialVertex::add_batch_ancestors(std::list<SequentialVertex*> batch) {
-    // need to keep the order of descendants.
-    std::stack<SequentialVertex*> stack;
-    for (auto iter = batch.rbegin(); iter != batch.rend(); iter++) {
-        auto current_vertex = *iter;
+    // sort by address.
+    _ancestors.sort(compareSequentialVertexPtrLess);
+    batch.sort(compareSequentialVertexPtrLess);
 
-        // TODO : Is there another way to avoid this situation?
-        bool is_exist = std::find_if(_ancestors.begin(), _ancestors.end(), [current_vertex](const SequentialVertex* v) {
-                            return *current_vertex == *v;
-                        }) != _ancestors.end();
-        if (is_exist) {
-            break;
-        } else {
-            stack.push(current_vertex);
-        }
-    }
-    while (!stack.empty()) {
-        add_ancestor(stack.top());
-        stack.pop();
-    }
+    std::list<SequentialVertex*> new_list;
+    std::set_difference(batch.begin(), batch.end(), _ancestors.begin(), _ancestors.end(), std::back_inserter(new_list),
+                        compareSequentialVertexPtrLess);
+
+    _ancestors.merge(new_list);
 }
 
 SequentialEdge* SequentialVertex::get_src_edge(SequentialVertex* source) const {
@@ -132,16 +147,38 @@ void SequentialVertex::removeDescendant(SequentialVertex* descendant) {
 }
 
 /**
+ * @description: Sort and Duplicate the ancestors.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialVertex::sortDuplicateAncestors() {
+    _ancestors.sort(compareSequentialVertexPtrLess);
+    _ancestors.unique(compareSequentialVertexPtrEqual);
+}
+
+/**
+ * @description: Sort and Duplicate the descendants.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialVertex::sortDuplicateDescendants() {
+    _descendants.sort(compareSequentialVertexPtrLess);
+    _descendants.unique(compareSequentialVertexPtrEqual);
+}
+
+/**
  * @description: update the ancestors.
  * @param {list<SequentialVertex*>} extra_ancestors
  * @return {*}
  * @author: ShiJian Chen
  */
 void SequentialVertex::updateAncestors(std::list<SequentialVertex*> extra_ancestors) {
-    _ancestors.sort(compareSequentialVertexPtrLess);
+    // _ancestors.sort(compareSequentialVertexPtrLess);
     // _ancestors.unique(compareSequentialVertexPtrEqual);
     extra_ancestors.sort(compareSequentialVertexPtrLess);
-    // extra_ancestors.unique(compareSequentialVertexPtrEqual);
+    extra_ancestors.unique(compareSequentialVertexPtrEqual);
 
     std::list<SequentialVertex*> difference_list;
     std::set_difference(extra_ancestors.begin(), extra_ancestors.end(), _ancestors.begin(), _ancestors.end(),
@@ -157,10 +194,10 @@ void SequentialVertex::updateAncestors(std::list<SequentialVertex*> extra_ancest
  */
 void SequentialVertex::updateDescendants(std::list<SequentialVertex*> extra_descendants) {
     // repeat or not is unimportant for find ring.
-    _descendants.sort(compareSequentialVertexPtrLess);
+    // _descendants.sort(compareSequentialVertexPtrLess);
     // _descendants.unique(compareSequentialVertexPtrEqual);
     extra_descendants.sort(compareSequentialVertexPtrLess);
-    // extra_descendants.unique(compareSequentialVertexPtrEqual);
+    extra_descendants.unique(compareSequentialVertexPtrEqual);
 
     std::list<SequentialVertex*> difference_list;
     std::set_difference(extra_descendants.begin(), extra_descendants.end(), _descendants.begin(), _descendants.end(),
@@ -168,6 +205,30 @@ void SequentialVertex::updateDescendants(std::list<SequentialVertex*> extra_desc
     _descendants.merge(difference_list);
 }
 
+// void SequentialVertex::mergeOppositeEdges() {
+//     for (auto src_edge : _src_edges) {
+//         auto sink_it = std::find_if(_sink_edges.begin(), _sink_edges.end(),
+//                                     [src_edge](const SequentialEdge* sink_edge) { return *src_edge == *sink_edge; });
+//         if (sink_it != _sink_edges.end()) {
+//             auto sink_edge = *sink_it;
+//             if (src_edge->get_setup_skew() > sink_edge->get_setup_skew()) {
+//                 // modify the src_edge skew.
+//                 double merge_skew = src_edge->get_setup_skew() - sink_edge->get_setup_skew();
+//                 src_edge->set_skew(merge_skew);
+//                 // delete the sink_edge.
+//                 removeSinkEdge(sink_edge);
+//                         }
+//         }
+//     }
+//     //
+// }
+
+/**
+ * @description: Remove the source edge.
+ * @param {SequentialEdge*} e
+ * @return {*}
+ * @author: ShiJian Chen
+ */
 void SequentialVertex::removeSrcEdge(SequentialEdge* e) {
     auto it =
         std::find_if(_src_edges.begin(), _src_edges.end(), [e](const SequentialEdge* edge) { return *e == *edge; });
@@ -178,6 +239,12 @@ void SequentialVertex::removeSrcEdge(SequentialEdge* e) {
     }
 }
 
+/**
+ * @description: Remove the sink edge.
+ * @param {SequentialEdge*} e
+ * @return {*}
+ * @author: ShiJian Chen
+ */
 void SequentialVertex::removeSinkEdge(SequentialEdge* e) {
     auto it =
         std::find_if(_sink_edges.begin(), _sink_edges.end(), [e](const SequentialEdge* edge) { return *e == *edge; });
@@ -266,7 +333,7 @@ void SkewConstraintGraph::deleteSequentialEdge(std::string name) {
         delete (*it).second;
         _sequential_edges.erase(it);
     } else {
-        _log->error("Wanna to delete an unexist sequential edge", 1, 0);
+        // _log->warn("Wanna to delete an unexist sequential edge :" + name, 1, 0);
     }
 }
 
@@ -319,7 +386,8 @@ bool SkewConstraintGraph::isExistentEdge(std::string src_name, std::string sink_
  * @return {*}
  * @author: ShiJian Chen
  */
-void SkewConstraintGraph::subgraphPartition(int max_subgraph_size) {
+std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph::subgraphPartition(
+    int max_subgraph_size) {
     std::unordered_map<int, SubCluster*> sub_clusters;
     std::vector<SkewConstraintGraph*> sub_graphs;
 
@@ -354,7 +422,26 @@ void SkewConstraintGraph::subgraphPartition(int max_subgraph_size) {
     _log->printInt("SubGraph Max Size", subgraph_max_size, 1);
     _log->printInt("SubGraph Min Size", subgraph_min_size, 1);
 
-    // TODO : parall to do sequential cluster.
+    // parall to do sequential cluster.
+    std::map<std::string, std::vector<const SequentialElement*>> clusters;
+
+    //     omp_set_num_threads(1);
+    // #pragma omp parallel for
+    for (size_t i = 0; i < sub_graphs.size(); i++) {
+        int j = static_cast<int>(i);
+        if (j == 3899) {
+            _log->printItself(std::to_string(i), 1);
+        }
+
+        auto sub_graph = sub_graphs[i];
+        sub_graph->initDistanceMatrix();
+        auto subs = sub_graph->makeVertexesFusion();
+        clusters.insert(subs.begin(), subs.end());
+        _log->printInt("Finish SubGraph", i, 1);
+    }
+
+    std::map<std::string, std::vector<const SequentialElement*>> buffer_clusters;
+    buffer_clusters = changeClusterName(clusters);
 
     // delete
     for (auto pair : sub_clusters) {
@@ -363,6 +450,8 @@ void SkewConstraintGraph::subgraphPartition(int max_subgraph_size) {
     for (auto graph : sub_graphs) {
         delete graph;
     }
+
+    return buffer_clusters;
 }
 
 /**
@@ -658,6 +747,13 @@ void SkewConstraintGraph::initReachableVertexes() {
         stack.push(po);
         hopBackwardDFS(stack);
     }
+
+    // add the sort duplicate operation.
+    for (auto pair : _sequential_vertexes) {
+        auto vertex = pair.second;
+        vertex->sortDuplicateAncestors();
+        vertex->sortDuplicateDescendants();
+    }
 }
 
 /**
@@ -850,6 +946,9 @@ double SkewConstraintGraph::get_direct_hop_skew(SequentialVertex* vertex_1, Sequ
  * @author: ShiJian Chen
  */
 void SkewConstraintGraph::initDistanceMatrix() {
+    initReachableVertexes();
+    initRegion();
+
     // define the search window.
     std::pair<Point<DBU>, Point<DBU>> search_region;
     std::vector<SequentialVertex*> region_vertexes;
@@ -888,13 +987,13 @@ void SkewConstraintGraph::initDistanceMatrix() {
     // print info.
     if (_parameter->get_row_height() != 0) {
         _log->printDouble("Search Window Edge / Row Height",
-                          _parameter->get_side_length() / _parameter->get_row_height(), 1);
+                          _parameter->get_side_length() / _parameter->get_row_height(), 2);
     }
     if (region_cnt != 0) {
         _log->printDouble("Search Window Average Vertexes(include the element itself)",
-                          region_vertexes_cnt / region_cnt, 1);
+                          region_vertexes_cnt / region_cnt, 2);
     }
-    _log->printPair("Distance Matrix", _distance_matrix.size(), _distance_matrix.size(), 1);
+    _log->printPair("Distance Matrix", _distance_matrix.size(), _distance_matrix.size(), 2);
 }
 
 /**
@@ -1295,8 +1394,8 @@ double SkewConstraintGraph::skewAccumulation(std::stack<SequentialVertex*> stack
  * @return {*}
  * @author: ShiJian Chen
  */
-std::map<std::string, std::vector<SequentialElement*>> SkewConstraintGraph::makeVertexesFusion() {
-    std::map<std::string, SequentialCluster*> clusters;
+std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph::makeVertexesFusion() {
+    std::list<SequentialCluster*> clusters;
 
     // TODO : loop condition should be considered.
     while (1) {
@@ -1333,7 +1432,7 @@ std::map<std::string, std::vector<SequentialElement*>> SkewConstraintGraph::make
                     // add flipflop.
                     cluster->addSubElement(element_1);
                     cluster->addSubElement(element_2);
-                    clusters.emplace(cluster->get_name(), cluster);
+                    clusters.push_back(cluster);
                     SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
                     updateTwoVertexesFusion(vertex_1, vertex_2, cluster_vertex);
                 } else if (element_1->isFlipFlop() && element_2->isCluster()) {
@@ -1379,7 +1478,10 @@ std::map<std::string, std::vector<SequentialElement*>> SkewConstraintGraph::make
                         cluster->addSubElement(flipflop);
                     }
                     // delete the cluster_2.
-                    auto it = clusters.find(cluster_2->get_name());
+                    auto it =
+                        std::find_if(clusters.begin(), clusters.end(), [cluster_2](const SequentialCluster* cluster) {
+                            return cluster->get_name() == cluster_2->get_name();
+                        });
                     if (it != clusters.end()) {
                         clusters.erase(it);
                     } else {
@@ -1394,22 +1496,34 @@ std::map<std::string, std::vector<SequentialElement*>> SkewConstraintGraph::make
         }
     }
 
-    // prepare the return value.
-    std::map<std::string, std::vector<SequentialElement*>> buffer_clusters;
-    int i = 0;
-    for (auto pair : clusters) {
-        SequentialCluster* cluster = pair.second;
-        std::vector<SequentialElement*> element_vec = cluster->get_all_element_vec();
-
-        buffer_clusters.emplace("buffer_" + std::to_string(i), element_vec);
-        i++;
+    std::map<std::string, std::vector<const SequentialElement*>> final_clusters;
+    for (auto cluster : clusters) {
+        std::vector<const SequentialElement*> element_vec = cluster->get_all_element_vec();
+        final_clusters.emplace(cluster->get_name(), element_vec);
     }
 
     // delete the clusters.
-    for (auto pair : clusters) {
-        delete pair.second;
+    for (auto cluster : clusters) {
+        delete cluster;
     }
     clusters.clear();
+    return final_clusters;
+}
+
+/**
+ * @description: Change the clusters name.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph::changeClusterName(
+    std::map<std::string, std::vector<const SequentialElement*>> clusters) {
+    std::map<std::string, std::vector<const SequentialElement*>> buffer_clusters;
+    int i = 0;
+    for (auto pair : clusters) {
+        buffer_clusters.emplace("buffer_" + std::to_string(i), pair.second);
+        i++;
+    }
     return buffer_clusters;
 }
 
@@ -1485,8 +1599,11 @@ void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, Sequ
             deleteSequentialEdge(edge->get_name());
             continue;
         }
+        double skew = edge->get_setup_skew();
+        vertex_1->removeSrcEdge(edge);
         source_v->removeSinkEdge(edge);
         SequentialEdge* new_edge = new SequentialEdge(source_v, new_vertex);
+        new_edge->set_skew(skew);
         source_v->add_sink_edge(new_edge);
         add_sequential_edge(new_edge);
         deleteSequentialEdge(edge->get_name());
@@ -1507,14 +1624,21 @@ void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, Sequ
         // avoid repeat add.
         auto new_v_edge = new_vertex->get_src_edge(source_v);
         if (!new_v_edge) {
+            double skew = edge->get_setup_skew();
+            vertex_2->removeSrcEdge(edge);
             source_v->removeSinkEdge(edge);
             SequentialEdge* new_edge = new SequentialEdge(source_v, new_vertex);
+            new_edge->set_skew(skew);
             source_v->add_sink_edge(new_edge);
             add_sequential_edge(new_edge);
             deleteSequentialEdge(edge->get_name());
 
             new_vertex->add_src_edge(new_edge);
         } else {
+            double merge_skew = (edge->get_setup_skew() + new_v_edge->get_setup_skew()) / 2;
+            new_v_edge->set_skew(merge_skew);
+
+            vertex_2->removeSrcEdge(edge);
             source_v->removeSinkEdge(edge);
             deleteSequentialEdge(edge->get_name());
         }
@@ -1524,10 +1648,36 @@ void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, Sequ
     for (auto edge : v1_sink_edges) {
         auto sink_v = edge->get_sink_vertex();
         if (*sink_v == *vertex_2) {
-            continue;
+            _log->error(vertex_1->get_name() + " with " + vertex_2->get_name() + " has no connection", 1, 0);
         }
+
+        // merge edge when the edge is exist.
+        auto it = new_vertex->get_src_edge(sink_v);
+        if (it) {
+            double skew_1 = it->get_setup_skew();
+            double skew_2 = edge->get_setup_skew();
+
+            if (skew_1 > skew_2) {
+                double merge_skew = skew_1 - skew_2;
+                it->set_skew(merge_skew);
+                // delete the old edge.
+                vertex_1->removeSinkEdge(edge);
+                sink_v->removeSrcEdge(edge);
+                deleteSequentialEdge(edge->get_name());
+                continue;
+            } else {
+                double merge_skew = skew_2 - skew_1;
+                edge->set_skew(merge_skew);
+                new_vertex->removeSrcEdge(it);
+                sink_v->removeSinkEdge(it);
+                deleteSequentialEdge(it->get_name());
+            }
+        }
+        double skew = edge->get_setup_skew();
+        vertex_1->removeSinkEdge(edge);
         sink_v->removeSrcEdge(edge);
         SequentialEdge* new_edge = new SequentialEdge(new_vertex, sink_v);
+        new_edge->set_skew(skew);
         sink_v->add_src_edge(new_edge);
         add_sequential_edge(new_edge);
         deleteSequentialEdge(edge->get_name());
@@ -1539,19 +1689,49 @@ void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, Sequ
     for (auto edge : v2_sink_edges) {
         auto sink_v = edge->get_sink_vertex();
         if (*sink_v == *vertex_1) {
-            continue;
+            _log->error(vertex_1->get_name() + " with " + vertex_2->get_name() + " has no connection", 1, 0);
         }
+
+        // merge edge when the edge is exist.
+        auto it = new_vertex->get_src_edge(sink_v);
+        if (it) {
+            double skew_1 = it->get_setup_skew();
+            double skew_2 = edge->get_setup_skew();
+
+            if (skew_1 > skew_2) {
+                double merge_skew = skew_1 - skew_2;
+                it->set_skew(merge_skew);
+                // delete the old edge.
+                vertex_2->removeSinkEdge(edge);
+                sink_v->removeSrcEdge(edge);
+                deleteSequentialEdge(edge->get_name());
+                continue;
+            } else {
+                double merge_skew = skew_2 - skew_1;
+                edge->set_skew(merge_skew);
+                new_vertex->removeSrcEdge(it);
+                sink_v->removeSinkEdge(it);
+                deleteSequentialEdge(it->get_name());
+            }
+        }
+
         // avoid repeat add.
         auto new_v_edge = new_vertex->get_sink_edge(sink_v);
         if (!new_v_edge) {
+            double skew = edge->get_setup_skew();
+            vertex_2->removeSinkEdge(edge);
             sink_v->removeSrcEdge(edge);
             SequentialEdge* new_edge = new SequentialEdge(new_vertex, sink_v);
+            new_edge->set_skew(skew);
             sink_v->add_src_edge(new_edge);
             add_sequential_edge(new_edge);
             deleteSequentialEdge(edge->get_name());
 
             new_vertex->add_sink_edge(new_edge);
         } else {
+            double merge_skew = (edge->get_setup_skew() + new_v_edge->get_setup_skew()) / 2;
+            new_v_edge->set_skew(merge_skew);
+            vertex_2->removeSinkEdge(edge);
             sink_v->removeSrcEdge(edge);
             deleteSequentialEdge(edge->get_name());
         }
@@ -1576,11 +1756,12 @@ void SkewConstraintGraph::modifyVertexAncestors(SequentialVertex* vertex_1, Sequ
         // new_vertex add the ancestor.
         new_vertex->add_ancestor(ancestor);
 
-        ancestor->removeDescendant(vertex_1);
-        ancestor->removeDescendant(vertex_2);
-
         ancestor->add_descendant(new_vertex);
         ancestor->updateDescendants(vertex_2->get_descendants());
+
+        // must be here.
+        ancestor->removeDescendant(vertex_1);
+        ancestor->removeDescendant(vertex_2);
     }
     auto v2_ancestors = vertex_2->get_ancestors();
     for (auto ancestor : v2_ancestors) {
@@ -1591,11 +1772,12 @@ void SkewConstraintGraph::modifyVertexAncestors(SequentialVertex* vertex_1, Sequ
         // new_vertex add the ancestor.
         new_vertex->add_ancestor(ancestor);
 
-        ancestor->removeDescendant(vertex_1);
-        ancestor->removeDescendant(vertex_2);
-
         ancestor->add_descendant(new_vertex);
         ancestor->updateDescendants(vertex_1->get_descendants());
+
+        // must be here.
+        ancestor->removeDescendant(vertex_1);
+        ancestor->removeDescendant(vertex_2);
     }
 }
 
@@ -1617,11 +1799,12 @@ void SkewConstraintGraph::modifyVertexDescendants(SequentialVertex* vertex_1, Se
         // new_vertex add the descendant.
         new_vertex->add_descendant(descendant);
 
-        descendant->removeAncestor(vertex_1);
-        descendant->removeAncestor(vertex_2);
-
         descendant->add_ancestor(new_vertex);
         descendant->updateAncestors(vertex_2->get_ancestors());
+
+        // must be here.
+        descendant->removeAncestor(vertex_1);
+        descendant->removeAncestor(vertex_2);
     }
 
     auto v2_descendants = vertex_2->get_descendants();
@@ -1632,11 +1815,12 @@ void SkewConstraintGraph::modifyVertexDescendants(SequentialVertex* vertex_1, Se
         }
         new_vertex->add_descendant(descendant);
 
-        descendant->removeAncestor(vertex_1);
-        descendant->removeAncestor(vertex_2);
-
         descendant->add_ancestor(new_vertex);
         descendant->updateAncestors(vertex_1->get_ancestors());
+
+        // must be here.
+        descendant->removeAncestor(vertex_1);
+        descendant->removeAncestor(vertex_2);
     }
 }
 

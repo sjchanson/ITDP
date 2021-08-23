@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:57:39
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 16:33:04
+ * @LastEditTime: 2021-08-19 16:12:09
  * @Description:
  */
 
@@ -77,16 +77,6 @@ SequentialOperator::~SequentialOperator() {
 }
 
 /**
- * @description: Run the SubGraphPartition version.
- * @param {*}
- * @return {*}
- * @author: ShiJian Chen
- */
-void SequentialOperator::subSequentialClusterSolve() {
-    _skew_constraint_graph->subgraphPartition(_parameter->get_clus_size());
-}
-
-/**
  * @description: Clean the exist clusters.
  * @param {*}
  * @return {*}
@@ -147,9 +137,6 @@ void SequentialOperator::init() {
 
     // set the max required skew.
     _parameter->set_max_required_skew(_max_required_skew);
-
-    _skew_constraint_graph->initReachableVertexes();
-    _skew_constraint_graph->initRegion();
 
     // print the circuit info.
     _log->printInt("Sequential PI", _sequential_base->get_sequential_pi_size(), 1);
@@ -448,7 +435,9 @@ void SequentialOperator::obtainSinkPins(SequentialElement* element, std::vector<
  */
 void SequentialOperator::sequentialClusterSolve() {
     cleanClusters();
-    _clusters_map = _skew_constraint_graph->makeVertexesFusion();
+
+    auto map = _skew_constraint_graph->makeVertexesFusion();
+    _clusters_map = _skew_constraint_graph->changeClusterName(map);
 
     // reset the sink element's belonging.
     _sequential_base->resetBelonging();
@@ -463,18 +452,14 @@ void SequentialOperator::sequentialClusterSolve() {
     }
 }
 
-// std::vector<std::vector<ClusterVertex*>> SequentialOperator::obtainPerfectBinaryTree() {
-//     std::vector<ClusterVertex*> vertexes;
-//     std::vector<std::vector<ClusterVertex*>> perfect_trees;
-//     for (auto pair : _clusters_map) {
-//         std::string buffer_name = pair.first;
-//         std::vector<SequentialElement*> remain_elements = pair.second;
-//         std::vector<ClusterVertex*> perfect_binary_tree;
-//         std::vector<std::pair<ClusterVertex*, ClusterVertex*>> binary_pairs;
-
-//         makeBinaryPair(remain_elements, binary_pairs);  // TODO.
-//         //
-//     }
-// }
+/**
+ * @description: Run the InitLevelCluster.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SequentialOperator::sloveInitLevelCluster() {
+    _clusters_map = _skew_constraint_graph->subgraphPartition(_parameter->get_clus_size());
+}
 
 }  // namespace itdp

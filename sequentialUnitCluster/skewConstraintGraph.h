@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:57:50
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-15 22:14:41
+ * @LastEditTime: 2021-08-22 09:58:27
  * @Description:
  */
 
@@ -56,15 +56,20 @@ public:
     void add_src_edge(SequentialEdge* src_edge) { _src_edges.push_back(src_edge); }
     void add_sink_edge(SequentialEdge* sink_edge) { _sink_edges.push_back(sink_edge); }
 
-    void add_descendant(SequentialVertex* v) { _descendants.emplace_back(v); }
+    void add_descendant(SequentialVertex* v);
     void add_batch_descendants(std::list<SequentialVertex*> batch);
-    void add_ancestor(SequentialVertex* v) { _ancestors.emplace_back(v); }
+    void add_ancestor(SequentialVertex* v);
     void add_batch_ancestors(std::list<SequentialVertex*> batch);
+
+    void sortDuplicateAncestors();
+    void sortDuplicateDescendants();
 
     void removeAncestor(SequentialVertex* ancestor);
     void removeDescendant(SequentialVertex* descendant);
     void updateAncestors(std::list<SequentialVertex*> extra_ancestors);
     void updateDescendants(std::list<SequentialVertex*> extra_descendants);
+
+    // void mergeOppositeEdges();
 
     void removeSrcEdge(SequentialEdge* e);
     void removeSinkEdge(SequentialEdge* e);
@@ -130,14 +135,16 @@ public:
     void add_sequential_edge(SequentialEdge* e);
     void add_x_vertex_mapping(int x, SequentialVertex* v);
 
-    void subgraphPartition(int max_subgraph_size);
+    std::map<std::string, std::vector<const SequentialElement*>> subgraphPartition(int max_subgraph_size);
 
     void initReachableVertexes();
     void initRegion();
 
     void initDistanceMatrix();
 
-    std::map<std::string, std::vector<SequentialElement*>> makeVertexesFusion();
+    std::map<std::string, std::vector<const SequentialElement*>> makeVertexesFusion();
+    std::map<std::string, std::vector<const SequentialElement*>> changeClusterName(
+        std::map<std::string, std::vector<const SequentialElement*>> clusters);
 
 private:
     std::string _name;

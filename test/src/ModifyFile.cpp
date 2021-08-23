@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-22 15:08:49
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 11:02:32
+ * @LastEditTime: 2021-08-22 17:25:49
  * @Description:
  */
 #include <gtest/gtest.h>
@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 
+#include "../DME/CtsBase.h"
 #include "/root/iTDP/iccadEstimator/evaluate.h"
 #include "/root/iTDP/sequentialUnitCluster/sequentialOperator.h"
 #include "common/logger.h"
@@ -67,7 +68,7 @@ TEST(SequentialGraph, buildGraph) {
 
 TEST(SequentialGraph, subGraphPartition) {
     string s1 = "benchmark/ICCAD15.parm";
-    string s2 = "benchmark/superblue18/superblue18.iccad2015";
+    string s2 = "benchmark/simple/simple.iccad2015";
 
     auto _circuit = make_shared<circuit>();
     _circuit->read_parameters(s1.c_str());
@@ -80,7 +81,7 @@ TEST(SequentialGraph, subGraphPartition) {
 
     itdp::SequentialOperator* opt = new itdp::SequentialOperator(adapter);
 
-    opt->subSequentialClusterSolve();
+    opt->sloveInitLevelCluster();
 
     delete opt;
     delete adapter;
@@ -100,8 +101,7 @@ TEST(SequentialGraph, initDistance) {
     itdp::AdapterInterface* adapter = new itdp::Iccad2015Adapter(_circuit);
 
     itdp::SequentialOperator* opt = new itdp::SequentialOperator(adapter);
-    opt->subSequentialClusterSolve();
-    opt->initDistanceMatrix();
+    // opt->initDistanceMatrix();
 
     delete opt;
     delete adapter;
@@ -122,9 +122,35 @@ TEST(SequentialGraph, vertexFusion) {
 
     itdp::SequentialOperator* opt = new itdp::SequentialOperator(adapter);
 
-    opt->initDistanceMatrix();
-    opt->sequentialClusterSolve();
+    // opt->initDistanceMatrix();
+    // opt->sequentialClusterSolve();
 
     delete opt;
     delete adapter;
+}
+
+TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
+    string s1 = "benchmark/ICCAD15.parm";
+    string s2 = "benchmark/superblue7/superblue7.iccad2015";
+
+    auto _circuit = make_shared<circuit>();
+    _circuit->read_parameters(s1.c_str());
+    _circuit->read_iccad2015_file(s2.c_str());
+    _circuit->copy_init_to_final();
+    _circuit->measure_timing();
+
+    itdp::Logger::get_logger_obj("googletest", 1);
+    itdp::AdapterInterface* adapter = new itdp::Iccad2015Adapter(_circuit);
+
+    itdp::SequentialOperator* opt = new itdp::SequentialOperator(adapter);
+
+    opt->sloveInitLevelCluster();
+
+    CtsBase* base = new CtsBase(opt->get_clusters_map());
+
+    base->get_binary_clusters();
+
+    delete opt;
+    delete adapter;
+    delete base;
 }

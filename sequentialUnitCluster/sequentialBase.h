@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 16:23:00
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-15 15:47:28
+ * @LastEditTime: 2021-08-18 20:49:06
  * @Description:
  */
 
@@ -44,7 +44,7 @@ public:
     void add_pi(SequentialPI* pi) { _pi_map.emplace(pi->get_name(), pi); }
     void add_po(SequentialPO* po) { _po_map.emplace(po->get_name(), po); }
     void add_flipflop(SequentialFlipFlop* flipflop) { _flipflop_map.emplace(flipflop->get_name(), flipflop); }
-    void add_buffer(SequentialBuffer* buffer, std::vector<SequentialElement*> slaves);  
+    void add_buffer(SequentialBuffer* buffer, std::vector<const SequentialElement*> slaves);
 
     void resetBelonging();
 

@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:51:11
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 13:14:01
+ * @LastEditTime: 2021-08-18 20:48:47
  * @Description:
  */
 
@@ -140,7 +140,7 @@ void SequentialBase::resetBelonging() {
  * @return {*}
  * @author: ShiJian Chen
  */
-void SequentialBase::add_buffer(SequentialBuffer* buffer, std::vector<SequentialElement*> slaves) {
+void SequentialBase::add_buffer(SequentialBuffer* buffer, std::vector<const SequentialElement*> slaves) {
     _buffer_map.emplace(buffer->get_name(), buffer);
     ClockNode* master = new ClockNode(buffer);
 

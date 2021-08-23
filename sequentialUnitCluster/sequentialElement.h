@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-01 20:11:31
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-15 15:41:18
+ * @LastEditTime: 2021-08-19 10:27:15
  * @Description:
  */
 
@@ -59,6 +59,17 @@ inline double SequentialElement::get_skew(std::string name) const {
     } else {
         return (*iter).second;
     }
+}
+
+struct SequentialElementPair {
+    SequentialElementPair(const SequentialElement* e1, const SequentialElement* e2);
+    const SequentialElement* element_1;
+    const SequentialElement* element_2;
+    double skew;
+};
+inline SequentialElementPair::SequentialElementPair(const SequentialElement* e1, const SequentialElement* e2) {
+    element_1 = e1;
+    element_2 = e2;
 }
 
 class SequentialPI : public SequentialElement {
@@ -144,21 +155,21 @@ public:
 
     // getter.
     int get_sub_size() const { return _sub_element_map.size(); }
-    SequentialElement* get_sub_element(std::string name) const;
-    std::vector<SequentialElement*> get_all_element_vec() const;
+    const SequentialElement* get_sub_element(std::string name) const;
+    std::vector<const SequentialElement*> get_all_element_vec() const;
 
     // setter.
-    void addSubElement(SequentialElement* element);
+    void addSubElement(const SequentialElement* element);
     void set_name(std::string name) { _name = name; }
 
 private:
-    std::map<std::string, SequentialElement*> _sub_element_map;
+    std::map<std::string, const SequentialElement*> _sub_element_map;
 };
 inline SequentialCluster::SequentialCluster(std::string name) {
     _name = name;
     _type = 5;
 }
-inline SequentialElement* SequentialCluster::get_sub_element(std::string name) const {
+inline const SequentialElement* SequentialCluster::get_sub_element(std::string name) const {
     auto iter = _sub_element_map.find(name);
     if (iter == _sub_element_map.end()) {
         return nullptr;
@@ -166,14 +177,14 @@ inline SequentialElement* SequentialCluster::get_sub_element(std::string name) c
         return (*iter).second;
     }
 }
-inline std::vector<SequentialElement*> SequentialCluster::get_all_element_vec() const {
-    std::vector<SequentialElement*> element_vec;
+inline std::vector<const SequentialElement*> SequentialCluster::get_all_element_vec() const {
+    std::vector<const SequentialElement*> element_vec;
     for (auto pair : _sub_element_map) {
         element_vec.push_back(pair.second);
     }
     return element_vec;
 }
-inline void SequentialCluster::addSubElement(SequentialElement* element) {
+inline void SequentialCluster::addSubElement(const SequentialElement* element) {
     int x_sum = get_coord().get_x() * _sub_element_map.size();
     int y_sum = get_coord().get_y() * _sub_element_map.size();
     _sub_element_map.emplace(element->get_name(), element);

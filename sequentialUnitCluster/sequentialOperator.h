@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 11:57:29
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 16:41:13
+ * @LastEditTime: 2021-08-18 20:44:24
  * @Description:
  */
 
@@ -37,17 +37,11 @@ public:
 
     // getter.
     double get_max_required_skew() const { return _max_required_skew; }
+    std::map<std::string, std::vector<const SequentialElement*>> get_clusters_map() const { return _clusters_map; }
 
     void buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map) {}  // TODO : Top-level Operations.
-    // std::vector<std::vector<ClusterVertex*>> obtainPerfectBinaryTree();
 
-    void subSequentialClusterSolve();
-
-    void initDistanceMatrix();
-
-    void cleanClusters();
-
-    void sequentialClusterSolve();
+    void sloveInitLevelCluster();
 
 private:
     Logger* _log;
@@ -55,11 +49,14 @@ private:
     AdapterInterface* _data_interface;
     SequentialBase* _sequential_base;
     SkewConstraintGraph* _skew_constraint_graph;
-    std::map<std::string, std::vector<SequentialElement*>> _clusters_map;
+    std::map<std::string, std::vector<const SequentialElement*>> _clusters_map;
     double _max_required_skew;
 
-    void init();
+    void initDistanceMatrix();
+    void cleanClusters();
+    void sequentialClusterSolve();
 
+    void init();
     void add_max_required_skew(double skew);
     void ergodicGenerateGraph(std::stack<SequentialElement*>& stack, std::set<std::string>& accessed_instance,
                               ProcessData* process_data);
@@ -69,10 +66,6 @@ private:
     void addSequentialGraph(std::vector<SequentialElement*> sink_elements,
                             std::stack<SequentialElement*> duplicate_stack);
     void addVertexes(std::vector<SequentialElement*> sink_elements, SequentialElement* source_element);
-
-    // perfect binary tree.
-    // void makeBinaryPair(std::vector<SequentialElement*>& remain_elements,
-    //                     std::vector<std::pair<ClusterVertex*, ClusterVertex*>>& binary_pairs);
 };
 
 }  // namespace itdp

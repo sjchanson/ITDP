@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:34:58
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-16 12:55:39
+ * @LastEditTime: 2021-08-18 20:50:41
  * @Description:
  */
 
@@ -18,7 +18,7 @@ namespace itdp {
 class ClockNode {
 public:
     ClockNode() = delete;
-    ClockNode(SequentialElement* instance);
+    ClockNode(const SequentialElement* instance);
     ~ClockNode() = default;
 
     // getter.
@@ -31,7 +31,7 @@ public:
     void add_slave(ClockNode* node) { _slaves.push_back(node); }
 
 private:
-    SequentialElement* _instance;
+    const SequentialElement* _instance;
     ClockNode* _master;
     std::vector<ClockNode*> _slaves;
 };

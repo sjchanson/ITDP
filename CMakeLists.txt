@@ -46,6 +46,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 # # Directory
 # add_subdirectory(${FLUTE_HOME})
 add_subdirectory(${CLUSTER_HOME})
+add_subdirectory(${PROJECT_SOURCE_DIR}/DME)
 # add_subdirectory(${REVISE_HOME})
 # aux_source_directory(${PROJECT_SOURCE_DIR}/src DIR_SRCS)
 
@@ -78,6 +79,7 @@ add_library(${PROJECT_NAME}
 )
 target_link_libraries(${PORJECT_NAME} iccadEstimator)
 target_link_libraries(${PORJECT_NAME} sequentialUnitCluster)
+target_link_libraries(${PROJECT_NAME} DME)
 
 
 
