@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-22 15:08:49
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-22 17:25:49
+ * @LastEditTime: 2021-08-23 10:49:16
  * @Description:
  */
 #include <gtest/gtest.h>
@@ -131,7 +131,7 @@ TEST(SequentialGraph, vertexFusion) {
 
 TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
     string s1 = "benchmark/ICCAD15.parm";
-    string s2 = "benchmark/superblue7/superblue7.iccad2015";
+    string s2 = "benchmark/simple/simple.iccad2015";
 
     auto _circuit = make_shared<circuit>();
     _circuit->read_parameters(s1.c_str());

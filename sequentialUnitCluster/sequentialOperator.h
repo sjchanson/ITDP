@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 11:57:29
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-18 20:44:24
+ * @LastEditTime: 2021-08-23 10:56:36
  * @Description:
  */
 
@@ -35,12 +35,8 @@ public:
     SequentialOperator(AdapterInterface* data_interface);
     ~SequentialOperator();
 
-    // getter.
-    double get_max_required_skew() const { return _max_required_skew; }
     std::map<std::string, std::vector<const SequentialElement*>> get_clusters_map() const { return _clusters_map; }
-
     void buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map) {}  // TODO : Top-level Operations.
-
     void sloveInitLevelCluster();
 
 private:

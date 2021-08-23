@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:57:50
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-22 09:58:27
+ * @LastEditTime: 2021-08-23 10:30:32
  * @Description:
  */
 
@@ -217,6 +217,10 @@ private:
     std::pair<std::string, std::string> obtainMinDistancePair();
     void updateTwoVertexesFusion(SequentialVertex* vertex_1, SequentialVertex* vertex_2, SequentialVertex* new_vertex);
     void updateGraphConnection(SequentialVertex* vertex_1, SequentialVertex* vertex_2, SequentialVertex* new_vertex);
+    void deleteDirectHopConnection(SequentialVertex* vertex_1, SequentialVertex* vertex_2);
+    void updateSourceConnection(SequentialVertex* vertex, SequentialVertex* new_vertex);
+    void updateSinkConnection(SequentialVertex* vertex, SequentialVertex* new_vertex);
+
     void modifyVertexAncestors(SequentialVertex* vertex_1, SequentialVertex* vertex_2, SequentialVertex* new_vertex);
     void modifyVertexDescendants(SequentialVertex* vertex_1, SequentialVertex* vertex_2, SequentialVertex* new_vertex);
 };

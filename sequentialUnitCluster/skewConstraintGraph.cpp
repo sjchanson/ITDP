@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-22 17:13:23
+ * @LastEditTime: 2021-08-23 10:59:47
  * @Description:
  */
 
@@ -1573,7 +1573,7 @@ void SkewConstraintGraph::updateTwoVertexesFusion(SequentialVertex* vertex_1, Se
     // update the distance matrix.
     modifyDidstanceMatrix(vertex_1, vertex_2, new_vertex);
 
-    // delete the two fusion vertex , add the new vertex.
+    // delete the two fusion vertex
     deleteSequentialVertex(vertex_1->get_name());
     deleteSequentialVertex(vertex_2->get_name());
 
@@ -1582,160 +1582,159 @@ void SkewConstraintGraph::updateTwoVertexesFusion(SequentialVertex* vertex_1, Se
 }
 
 /**
- * @description: Upadate the graph connection. TODO : Need to optimize.
+ * @description: Delete the direct hop connection.
+ * @param {SequentialVertex*} vertex_1
+ * @param {SequentialVertex*} vertex_2
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::deleteDirectHopConnection(SequentialVertex* vertex_1, SequentialVertex* vertex_2) {
+    auto src_e1 = vertex_1->get_src_edge(vertex_2);
+    if (src_e1) {
+        vertex_1->removeSrcEdge(src_e1);
+        vertex_2->removeSinkEdge(src_e1);
+        deleteSequentialEdge(src_e1->get_name());
+    }
+
+    auto src_e2 = vertex_2->get_src_edge(vertex_1);
+    if (src_e2) {
+        vertex_2->removeSrcEdge(src_e2);
+        vertex_1->removeSinkEdge(src_e2);
+        deleteSequentialEdge(src_e2->get_name());
+    }
+}
+
+/**
+ * @description: Update the source connetion.
+ * @param {SequentialVertex*} vertex
+ * @param {SequentialVertex*} new_vertex
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::updateSourceConnection(SequentialVertex* vertex, SequentialVertex* new_vertex) {
+    std::vector<SequentialEdge*> src_edges = vertex->get_src_edges();
+    for (auto edge : src_edges) {
+        auto src_v = edge->get_src_vertex();
+
+        // avoid repeat add.
+        auto exist_e1 = new_vertex->get_src_edge(src_v);
+        if (exist_e1) {
+            double merge_skew = (edge->get_setup_skew() + exist_e1->get_setup_skew()) / 2;
+            exist_e1->set_skew(merge_skew);
+            src_v->removeSinkEdge(edge);
+            vertex->removeSrcEdge(edge);
+            deleteSequentialEdge(edge->get_name());
+            continue;
+        }
+
+        // avoid reverse add.
+        auto exist_e2 = new_vertex->get_sink_edge(src_v);
+        if (exist_e2) {
+            double skew_1 = edge->get_setup_skew();
+            double skew_2 = exist_e2->get_setup_skew();
+
+            if (skew_1 > skew_2) {
+                double merge_skew = skew_1 - skew_2;
+                edge->set_skew(merge_skew);
+
+                new_vertex->removeSinkEdge(exist_e2);
+                src_v->removeSrcEdge(exist_e2);
+                deleteSequentialEdge(exist_e2->get_name());
+            } else {
+                double merge_skew = skew_2 - skew_1;
+                exist_e2->set_skew(merge_skew);
+
+                src_v->removeSinkEdge(edge);
+                vertex->removeSrcEdge(edge);
+                deleteSequentialEdge(edge->get_name());
+                continue;
+            }
+        }
+
+        vertex->removeSrcEdge(edge);
+        src_v->removeSinkEdge(edge);
+        SequentialEdge* new_edge = new SequentialEdge(src_v, new_vertex);
+        new_edge->set_skew(edge->get_setup_skew());
+        src_v->add_sink_edge(new_edge);
+        new_vertex->add_src_edge(new_edge);
+        add_sequential_edge(new_edge);
+
+        deleteSequentialEdge(edge->get_name());
+    }
+}
+
+/**
+ * @description: Update the sink connection.
+ * @param {SequentialVertex*} vertex
+ * @param {SequentialVertex*} new_vertex
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::updateSinkConnection(SequentialVertex* vertex, SequentialVertex* new_vertex) {
+    std::vector<SequentialEdge*> sink_edges = vertex->get_sink_edges();
+    for (auto edge : sink_edges) {
+        auto sink_v = edge->get_sink_vertex();
+
+        // avoid repeat add.
+        auto exist_e1 = new_vertex->get_sink_edge(sink_v);
+        if (exist_e1) {
+            double merge_skew = (edge->get_setup_skew() + exist_e1->get_setup_skew()) / 2;
+            exist_e1->set_skew(merge_skew);
+            vertex->removeSinkEdge(edge);
+            sink_v->removeSrcEdge(edge);
+            deleteSequentialEdge(edge->get_name());
+            continue;
+        }
+
+        // avoid reverse add.
+        auto exist_e2 = new_vertex->get_src_edge(sink_v);
+        if (exist_e2) {
+            double skew_1 = edge->get_setup_skew();
+            double skew_2 = exist_e2->get_setup_skew();
+
+            if (skew_1 > skew_2) {
+                double merge_skew = skew_1 - skew_2;
+                edge->set_skew(merge_skew);
+
+                new_vertex->removeSrcEdge(exist_e2);
+                sink_v->removeSinkEdge(exist_e2);
+                deleteSequentialEdge(exist_e2->get_name());
+            } else {
+                double merge_skew = skew_2 - skew_1;
+                exist_e2->set_skew(merge_skew);
+
+                vertex->removeSinkEdge(edge);
+                sink_v->removeSrcEdge(edge);
+                deleteSequentialEdge(edge->get_name());
+                continue;
+            }
+        }
+
+        vertex->removeSinkEdge(edge);
+        sink_v->removeSrcEdge(edge);
+        SequentialEdge* new_edge = new SequentialEdge(new_vertex, sink_v);
+        new_edge->set_skew(edge->get_setup_skew());
+        sink_v->add_src_edge(new_edge);
+        new_vertex->add_sink_edge(new_edge);
+        add_sequential_edge(new_edge);
+
+        deleteSequentialEdge(edge->get_name());
+    }
+}
+
+/**
+ * @description: Upadate the graph connection.
  * @param {*}
  * @return {*}
  * @author: ShiJian Chen
  */
 void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, SequentialVertex* vertex_2,
                                                 SequentialVertex* new_vertex) {
-    std::vector<SequentialEdge*> v1_src_edges = vertex_1->get_src_edges();
-    for (auto edge : v1_src_edges) {
-        auto source_v = edge->get_src_vertex();
-        if (*source_v == *vertex_2) {
-            // delete the edge.
-            vertex_2->removeSinkEdge(edge);
-            vertex_1->removeSrcEdge(edge);
-            deleteSequentialEdge(edge->get_name());
-            continue;
-        }
-        double skew = edge->get_setup_skew();
-        vertex_1->removeSrcEdge(edge);
-        source_v->removeSinkEdge(edge);
-        SequentialEdge* new_edge = new SequentialEdge(source_v, new_vertex);
-        new_edge->set_skew(skew);
-        source_v->add_sink_edge(new_edge);
-        add_sequential_edge(new_edge);
-        deleteSequentialEdge(edge->get_name());
-
-        new_vertex->add_src_edge(new_edge);
-    }
-
-    std::vector<SequentialEdge*> v2_src_edges = vertex_2->get_src_edges();
-    for (auto edge : v2_src_edges) {
-        auto source_v = edge->get_src_vertex();
-        if (*source_v == *vertex_1) {
-            // delete the edge.
-            vertex_1->removeSinkEdge(edge);
-            vertex_2->removeSrcEdge(edge);
-            deleteSequentialEdge(edge->get_name());
-            continue;
-        }
-        // avoid repeat add.
-        auto new_v_edge = new_vertex->get_src_edge(source_v);
-        if (!new_v_edge) {
-            double skew = edge->get_setup_skew();
-            vertex_2->removeSrcEdge(edge);
-            source_v->removeSinkEdge(edge);
-            SequentialEdge* new_edge = new SequentialEdge(source_v, new_vertex);
-            new_edge->set_skew(skew);
-            source_v->add_sink_edge(new_edge);
-            add_sequential_edge(new_edge);
-            deleteSequentialEdge(edge->get_name());
-
-            new_vertex->add_src_edge(new_edge);
-        } else {
-            double merge_skew = (edge->get_setup_skew() + new_v_edge->get_setup_skew()) / 2;
-            new_v_edge->set_skew(merge_skew);
-
-            vertex_2->removeSrcEdge(edge);
-            source_v->removeSinkEdge(edge);
-            deleteSequentialEdge(edge->get_name());
-        }
-    }
-
-    std::vector<SequentialEdge*> v1_sink_edges = vertex_1->get_sink_edges();
-    for (auto edge : v1_sink_edges) {
-        auto sink_v = edge->get_sink_vertex();
-        if (*sink_v == *vertex_2) {
-            _log->error(vertex_1->get_name() + " with " + vertex_2->get_name() + " has no connection", 1, 0);
-        }
-
-        // merge edge when the edge is exist.
-        auto it = new_vertex->get_src_edge(sink_v);
-        if (it) {
-            double skew_1 = it->get_setup_skew();
-            double skew_2 = edge->get_setup_skew();
-
-            if (skew_1 > skew_2) {
-                double merge_skew = skew_1 - skew_2;
-                it->set_skew(merge_skew);
-                // delete the old edge.
-                vertex_1->removeSinkEdge(edge);
-                sink_v->removeSrcEdge(edge);
-                deleteSequentialEdge(edge->get_name());
-                continue;
-            } else {
-                double merge_skew = skew_2 - skew_1;
-                edge->set_skew(merge_skew);
-                new_vertex->removeSrcEdge(it);
-                sink_v->removeSinkEdge(it);
-                deleteSequentialEdge(it->get_name());
-            }
-        }
-        double skew = edge->get_setup_skew();
-        vertex_1->removeSinkEdge(edge);
-        sink_v->removeSrcEdge(edge);
-        SequentialEdge* new_edge = new SequentialEdge(new_vertex, sink_v);
-        new_edge->set_skew(skew);
-        sink_v->add_src_edge(new_edge);
-        add_sequential_edge(new_edge);
-        deleteSequentialEdge(edge->get_name());
-
-        new_vertex->add_sink_edge(new_edge);
-    }
-
-    std::vector<SequentialEdge*> v2_sink_edges = vertex_2->get_sink_edges();
-    for (auto edge : v2_sink_edges) {
-        auto sink_v = edge->get_sink_vertex();
-        if (*sink_v == *vertex_1) {
-            _log->error(vertex_1->get_name() + " with " + vertex_2->get_name() + " has no connection", 1, 0);
-        }
-
-        // merge edge when the edge is exist.
-        auto it = new_vertex->get_src_edge(sink_v);
-        if (it) {
-            double skew_1 = it->get_setup_skew();
-            double skew_2 = edge->get_setup_skew();
-
-            if (skew_1 > skew_2) {
-                double merge_skew = skew_1 - skew_2;
-                it->set_skew(merge_skew);
-                // delete the old edge.
-                vertex_2->removeSinkEdge(edge);
-                sink_v->removeSrcEdge(edge);
-                deleteSequentialEdge(edge->get_name());
-                continue;
-            } else {
-                double merge_skew = skew_2 - skew_1;
-                edge->set_skew(merge_skew);
-                new_vertex->removeSrcEdge(it);
-                sink_v->removeSinkEdge(it);
-                deleteSequentialEdge(it->get_name());
-            }
-        }
-
-        // avoid repeat add.
-        auto new_v_edge = new_vertex->get_sink_edge(sink_v);
-        if (!new_v_edge) {
-            double skew = edge->get_setup_skew();
-            vertex_2->removeSinkEdge(edge);
-            sink_v->removeSrcEdge(edge);
-            SequentialEdge* new_edge = new SequentialEdge(new_vertex, sink_v);
-            new_edge->set_skew(skew);
-            sink_v->add_src_edge(new_edge);
-            add_sequential_edge(new_edge);
-            deleteSequentialEdge(edge->get_name());
-
-            new_vertex->add_sink_edge(new_edge);
-        } else {
-            double merge_skew = (edge->get_setup_skew() + new_v_edge->get_setup_skew()) / 2;
-            new_v_edge->set_skew(merge_skew);
-            vertex_2->removeSinkEdge(edge);
-            sink_v->removeSrcEdge(edge);
-            deleteSequentialEdge(edge->get_name());
-        }
-    }
+    deleteDirectHopConnection(vertex_1, vertex_2);
+    updateSourceConnection(vertex_1, new_vertex);
+    updateSourceConnection(vertex_2, new_vertex);
+    updateSinkConnection(vertex_1, new_vertex);
+    updateSinkConnection(vertex_2, new_vertex);
 }
 
 /**
