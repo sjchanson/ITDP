@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-23 10:59:47
+ * @LastEditTime: 2021-08-23 11:02:42
  * @Description:
  */
 
@@ -428,11 +428,6 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
     //     omp_set_num_threads(1);
     // #pragma omp parallel for
     for (size_t i = 0; i < sub_graphs.size(); i++) {
-        int j = static_cast<int>(i);
-        if (j == 3899) {
-            _log->printItself(std::to_string(i), 1);
-        }
-
         auto sub_graph = sub_graphs[i];
         sub_graph->initDistanceMatrix();
         auto subs = sub_graph->makeVertexesFusion();
