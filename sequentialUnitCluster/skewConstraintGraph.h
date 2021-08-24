@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:57:50
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-23 10:30:32
+ * @LastEditTime: 2021-08-24 20:37:57
  * @Description:
  */
 
@@ -68,8 +68,6 @@ public:
     void removeDescendant(SequentialVertex* descendant);
     void updateAncestors(std::list<SequentialVertex*> extra_ancestors);
     void updateDescendants(std::list<SequentialVertex*> extra_descendants);
-
-    // void mergeOppositeEdges();
 
     void removeSrcEdge(SequentialEdge* e);
     void removeSinkEdge(SequentialEdge* e);
@@ -142,9 +140,13 @@ public:
 
     void initDistanceMatrix();
 
+    void updateGraphConnectionFromSubGraph(std::string cluster_name,
+                                           std::vector<const SequentialElement*> fusion_flipflops,
+                                           SequentialElement* buffer);
+
+    void modifyVertexName(std::string old_name, SequentialElement* buffer);
+
     std::map<std::string, std::vector<const SequentialElement*>> makeVertexesFusion();
-    std::map<std::string, std::vector<const SequentialElement*>> changeClusterName(
-        std::map<std::string, std::vector<const SequentialElement*>> clusters);
 
 private:
     std::string _name;
@@ -170,8 +172,13 @@ private:
 
     // subgraph partition function
     std::vector<SequentialEdge*> sortEdgeBySkew();
-    void subClusterClassification(std::vector<SequentialEdge*> edges,
-                                  std::unordered_map<int, SubCluster*>& sub_clusters, int max_subgraph_size);
+    std::vector<SequentialVertex*> subClusterClassification(std::vector<SequentialEdge*> edges,
+                                                            std::map<int, SubCluster*>& sub_clusters,
+                                                            int max_subgraph_size,
+                                                            std::vector<SequentialVertex*> flipflop_vertexes);
+    void subClusterCompletion(std::map<int, SubCluster*>& sub_clusters, std::vector<SequentialVertex*> remain_vertexes);
+    void subClusterBalance(std::map<int, SubCluster*>& sub_clusters, int max_subgraph_size);
+
     bool isExtraGreaterSkew(SequentialVertex* vertex, SequentialVertex* inner_vertex, SubCluster* sub_cluster,
                             double current_skew);
     void constructSubGraph(SkewConstraintGraph* sub_graph, SubCluster* sub_cluster);

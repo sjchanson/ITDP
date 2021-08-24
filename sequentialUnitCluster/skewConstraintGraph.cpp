@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-23 11:02:42
+ * @LastEditTime: 2021-08-24 21:07:47
  * @Description:
  */
 
@@ -175,8 +175,8 @@ void SequentialVertex::sortDuplicateDescendants() {
  * @author: ShiJian Chen
  */
 void SequentialVertex::updateAncestors(std::list<SequentialVertex*> extra_ancestors) {
-    // _ancestors.sort(compareSequentialVertexPtrLess);
-    // _ancestors.unique(compareSequentialVertexPtrEqual);
+    _ancestors.sort(compareSequentialVertexPtrLess);
+    _ancestors.unique(compareSequentialVertexPtrEqual);
     extra_ancestors.sort(compareSequentialVertexPtrLess);
     extra_ancestors.unique(compareSequentialVertexPtrEqual);
 
@@ -194,8 +194,8 @@ void SequentialVertex::updateAncestors(std::list<SequentialVertex*> extra_ancest
  */
 void SequentialVertex::updateDescendants(std::list<SequentialVertex*> extra_descendants) {
     // repeat or not is unimportant for find ring.
-    // _descendants.sort(compareSequentialVertexPtrLess);
-    // _descendants.unique(compareSequentialVertexPtrEqual);
+    _descendants.sort(compareSequentialVertexPtrLess);
+    _descendants.unique(compareSequentialVertexPtrEqual);
     extra_descendants.sort(compareSequentialVertexPtrLess);
     extra_descendants.unique(compareSequentialVertexPtrEqual);
 
@@ -204,24 +204,6 @@ void SequentialVertex::updateDescendants(std::list<SequentialVertex*> extra_desc
                         std::back_inserter(difference_list), compareSequentialVertexPtrLess);
     _descendants.merge(difference_list);
 }
-
-// void SequentialVertex::mergeOppositeEdges() {
-//     for (auto src_edge : _src_edges) {
-//         auto sink_it = std::find_if(_sink_edges.begin(), _sink_edges.end(),
-//                                     [src_edge](const SequentialEdge* sink_edge) { return *src_edge == *sink_edge; });
-//         if (sink_it != _sink_edges.end()) {
-//             auto sink_edge = *sink_it;
-//             if (src_edge->get_setup_skew() > sink_edge->get_setup_skew()) {
-//                 // modify the src_edge skew.
-//                 double merge_skew = src_edge->get_setup_skew() - sink_edge->get_setup_skew();
-//                 src_edge->set_skew(merge_skew);
-//                 // delete the sink_edge.
-//                 removeSinkEdge(sink_edge);
-//                         }
-//         }
-//     }
-//     //
-// }
 
 /**
  * @description: Remove the source edge.
@@ -388,14 +370,25 @@ bool SkewConstraintGraph::isExistentEdge(std::string src_name, std::string sink_
  */
 std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph::subgraphPartition(
     int max_subgraph_size) {
-    std::unordered_map<int, SubCluster*> sub_clusters;
+    std::map<int, SubCluster*> sub_clusters;
     std::vector<SkewConstraintGraph*> sub_graphs;
+    std::vector<SequentialVertex*> flipflop_vertexes;
+
+    // obtain the flipflop vertexes.
+    for (auto pair : _sequential_vertexes) {
+        if (pair.second->get_node()->isFlipFlop()) {
+            flipflop_vertexes.push_back(pair.second);
+        }
+    }
 
     std::vector<SequentialEdge*> ascend_skew_edges = sortEdgeBySkew();
     // classification.
-    subClusterClassification(ascend_skew_edges, sub_clusters, max_subgraph_size);
-
-    // TODO : Move the single cell into cluster.
+    std::vector<SequentialVertex*> remain_vertexes;
+    remain_vertexes = subClusterClassification(ascend_skew_edges, sub_clusters, max_subgraph_size, flipflop_vertexes);
+    // Move the single cell into cluster.
+    subClusterCompletion(sub_clusters, remain_vertexes);
+    // balance the sub clusters.
+    subClusterBalance(sub_clusters, max_subgraph_size);
 
     // bulid the subGraph.
     int subgraph_id = 0;
@@ -418,7 +411,8 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
 
     // print info.
     _log->printInt("SubGraph Count", sub_graphs.size(), 1);
-    _log->printDouble("SubGraph Average Size", subgraph_vertexes_cnt / (subgraph_id + 1), 1);
+    double subgraph_avg_size = static_cast<double>(subgraph_vertexes_cnt) / static_cast<double>(subgraph_id + 1);
+    _log->printDouble("SubGraph Average Size", subgraph_avg_size, 1);
     _log->printInt("SubGraph Max Size", subgraph_max_size, 1);
     _log->printInt("SubGraph Min Size", subgraph_min_size, 1);
 
@@ -428,15 +422,18 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
     //     omp_set_num_threads(1);
     // #pragma omp parallel for
     for (size_t i = 0; i < sub_graphs.size(); i++) {
+        // debug.
+        // int j = static_cast<int>(i);
+        // if (j == 58) {
+        //     _log->printItself(std::to_string(j), 1);
+        // }
+
         auto sub_graph = sub_graphs[i];
         sub_graph->initDistanceMatrix();
         auto subs = sub_graph->makeVertexesFusion();
         clusters.insert(subs.begin(), subs.end());
         _log->printInt("Finish SubGraph", i, 1);
     }
-
-    std::map<std::string, std::vector<const SequentialElement*>> buffer_clusters;
-    buffer_clusters = changeClusterName(clusters);
 
     // delete
     for (auto pair : sub_clusters) {
@@ -446,7 +443,128 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
         delete graph;
     }
 
-    return buffer_clusters;
+    return clusters;
+}
+
+/**
+ * @description: Complete the subCluster.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::subClusterCompletion(std::map<int, SubCluster*>& sub_clusters,
+                                               std::vector<SequentialVertex*> remain_vertexes) {
+    size_t max_idx = sub_clusters.rbegin()->first;
+
+    for (auto vertex : remain_vertexes) {
+        SubCluster* sub_cluster = new SubCluster(++max_idx);
+        sub_cluster->add_sub_vertex(vertex);
+        sub_clusters.emplace(sub_cluster->idx, sub_cluster);
+    }
+}
+
+/**
+ * @description: Balance the subCluster.
+ * @param {int} max_subgraph_size
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::subClusterBalance(std::map<int, SubCluster*>& sub_clusters, int max_subgraph_size) {
+    size_t max_idx = sub_clusters.rbegin()->first;
+
+    std::vector<SequentialVertex*> reunion_vertexes;
+    std::vector<SubCluster*> delete_clusters;
+    for (auto pair : sub_clusters) {
+        auto sub_cluster = pair.second;
+        if (sub_cluster->sub_vertexes.size() < static_cast<size_t>(max_subgraph_size)) {
+            delete_clusters.push_back(sub_cluster);
+            for (auto sub_v : sub_cluster->sub_vertexes) {
+                reunion_vertexes.push_back(sub_v);
+            }
+        }
+    }
+    for (auto cluster : delete_clusters) {
+        sub_clusters.erase(cluster->idx);
+        delete cluster;
+    }
+
+    int grid_size = std::sqrt(reunion_vertexes.size() / max_subgraph_size);
+    int x_interval = reunion_vertexes.size() / (grid_size + 1);
+    int y_interval = max_subgraph_size;
+
+    // sort the reunion_vertexes.
+    std::unordered_set<int> x_coords;
+    std::vector<int> x_coords_vec;
+    std::map<int, std::vector<SequentialVertex*>> x_to_vertexes;
+    for (auto reunion_v : reunion_vertexes) {
+        auto current_element = reunion_v->get_node();
+        int x_coord = current_element->get_coord().get_x();
+        x_coords.emplace(x_coord);
+        // add to the vector.
+        auto it = x_to_vertexes.find(x_coord);
+        if (it == x_to_vertexes.end()) {
+            std::vector<SequentialVertex*> vertexes{reunion_v};
+            x_to_vertexes.emplace(x_coord, vertexes);
+        } else {
+            it->second.push_back(reunion_v);
+        }
+    }
+    x_coords_vec.assign(x_coords.begin(), x_coords.end());
+    std::sort(x_coords_vec.begin(), x_coords_vec.end());
+
+    // rearrangement.
+    std::vector<std::vector<SequentialVertex*>> x_clusters;
+    std::vector<SequentialVertex*> tmp_vec;
+    for (auto x_coord : x_coords_vec) {
+        auto vertex_vec = x_to_vertexes[x_coord];
+        if (tmp_vec.size() + vertex_vec.size() > static_cast<size_t>(x_interval)) {
+            std::vector<SequentialVertex*> x_cluster = tmp_vec;
+            x_clusters.push_back(x_cluster);
+            tmp_vec.clear();
+        }
+        tmp_vec.insert(tmp_vec.end(), vertex_vec.begin(), vertex_vec.end());
+    }
+    std::vector<SequentialVertex*> x_cluster = tmp_vec;
+    x_clusters.push_back(x_cluster);
+    tmp_vec.clear();
+
+    for (auto x_cluster : x_clusters) {
+        std::unordered_set<int> y_coords;
+        std::vector<int> y_coords_vec;
+        std::map<int, std::vector<SequentialVertex*>> y_to_vertexes;
+        for (auto current_v : x_cluster) {
+            auto current_element = current_v->get_node();
+            int y_coord = current_element->get_coord().get_y();
+            y_coords.emplace(y_coord);
+            // add to the vector.
+            auto it = y_to_vertexes.find(y_coord);
+            if (it == y_to_vertexes.end()) {
+                std::vector<SequentialVertex*> vertexes{current_v};
+                y_to_vertexes.emplace(y_coord, vertexes);
+            } else {
+                it->second.push_back(current_v);
+            }
+        }
+        y_coords_vec.assign(y_coords.begin(), y_coords.end());
+        std::sort(y_coords_vec.begin(), y_coords_vec.end());
+
+        // rearrangement.
+        std::vector<SequentialVertex*> tmp_vec;
+        for (auto y_coord : y_coords_vec) {
+            auto vertex_vec = y_to_vertexes[y_coord];
+            if (tmp_vec.size() + vertex_vec.size() > static_cast<size_t>(y_interval)) {
+                SubCluster* sub_cluster = new SubCluster(++max_idx);
+                sub_cluster->sub_vertexes = tmp_vec;
+                sub_clusters.emplace(sub_cluster->idx, sub_cluster);
+                tmp_vec.clear();
+            }
+            tmp_vec.insert(tmp_vec.end(), vertex_vec.begin(), vertex_vec.end());
+        }
+        SubCluster* sub_cluster = new SubCluster(++max_idx);
+        sub_cluster->sub_vertexes = tmp_vec;
+        sub_clusters.emplace(sub_cluster->idx, sub_cluster);
+        tmp_vec.clear();
+    }
 }
 
 /**
@@ -465,19 +583,21 @@ std::vector<SequentialEdge*> SkewConstraintGraph::sortEdgeBySkew() {
 }
 
 /**
- * @description: Main function of sub cluster partition.
+ * @description: Main function of sub cluster partition, return the remain vertexes.
  * @param {*}
  * @return {*}
  * @author: ShiJian Chen
  */
-void SkewConstraintGraph::subClusterClassification(std::vector<SequentialEdge*> edges,
-                                                   std::unordered_map<int, SubCluster*>& sub_clusters,
-                                                   int max_subgraph_size) {
+std::vector<SequentialVertex*> SkewConstraintGraph::subClusterClassification(
+    std::vector<SequentialEdge*> edges, std::map<int, SubCluster*>& sub_clusters, int max_subgraph_size,
+    std::vector<SequentialVertex*> flipflop_vertexes) {
     int subcluster_id = 0;
+    std::vector<SequentialVertex*> remain_vertexes;
     std::map<std::string, int> vertex_to_subcluster;
     for (auto edge : edges) {
         auto vertex_1 = edge->get_src_vertex();
         auto vertex_2 = edge->get_sink_vertex();
+
         auto iter_1 = vertex_to_subcluster.find(vertex_1->get_name());
         auto iter_2 = vertex_to_subcluster.find(vertex_2->get_name());
         bool flag_1, flag_2;
@@ -493,7 +613,7 @@ void SkewConstraintGraph::subClusterClassification(std::vector<SequentialEdge*> 
             ++subcluster_id;
         } else if (flag_1 && !flag_2) {
             int idx = (*iter_1).second;
-            if (sub_clusters[idx]->sub_vertexes.size() > static_cast<size_t>(max_subgraph_size)) {
+            if (sub_clusters[idx]->sub_vertexes.size() >= static_cast<size_t>(max_subgraph_size)) {
                 continue;
             }
             bool exist_flag = isExtraGreaterSkew(vertex_2, vertex_1, sub_clusters[idx], edge->get_setup_skew());
@@ -503,7 +623,7 @@ void SkewConstraintGraph::subClusterClassification(std::vector<SequentialEdge*> 
             }
         } else if (!flag_1 && flag_2) {
             int idx = (*iter_2).second;
-            if (sub_clusters[idx]->sub_vertexes.size() > static_cast<size_t>(max_subgraph_size)) {
+            if (sub_clusters[idx]->sub_vertexes.size() >= static_cast<size_t>(max_subgraph_size)) {
                 continue;
             }
             bool exist_flag = isExtraGreaterSkew(vertex_1, vertex_2, sub_clusters[idx], edge->get_setup_skew());
@@ -520,7 +640,7 @@ void SkewConstraintGraph::subClusterClassification(std::vector<SequentialEdge*> 
             if (idx_1 == idx_2) {
                 continue;
             }
-            if (vertex1_vec.size() + vertex2_vec.size() > static_cast<size_t>(max_subgraph_size)) {
+            if (vertex1_vec.size() + vertex2_vec.size() >= static_cast<size_t>(max_subgraph_size)) {
                 continue;
             }
             bool exist_flag = false;
@@ -541,6 +661,13 @@ void SkewConstraintGraph::subClusterClassification(std::vector<SequentialEdge*> 
             }
         }
     }
+    for (auto v : flipflop_vertexes) {
+        // the vertex has not belonged to a subcluster.
+        if (vertex_to_subcluster.find(v->get_name()) == vertex_to_subcluster.end()) {
+            remain_vertexes.push_back(v);
+        }
+    }
+    return remain_vertexes;
 }
 
 /**
@@ -941,6 +1068,10 @@ double SkewConstraintGraph::get_direct_hop_skew(SequentialVertex* vertex_1, Sequ
  * @author: ShiJian Chen
  */
 void SkewConstraintGraph::initDistanceMatrix() {
+    _x_coordinates.clear();
+    _x_to_vertexes.clear();
+    _distance_matrix.clear();
+
     initReachableVertexes();
     initRegion();
 
@@ -963,6 +1094,9 @@ void SkewConstraintGraph::initDistanceMatrix() {
             region_vertexes_cnt += region_vertexes.size();
             for (auto region_v : region_vertexes) {
                 if (findRing(current_vertex, region_v)) {
+                    double skew = _parameter->get_max_required_skew();
+                    double distance = calculateDistance(current_vertex, region_v, skew);
+                    updateDistanceMatrix(current_vertex->get_name(), region_v->get_name(), distance);
                     continue;
                 }
                 if (isDirectHop(current_vertex, region_v)) {
@@ -982,13 +1116,13 @@ void SkewConstraintGraph::initDistanceMatrix() {
     // print info.
     if (_parameter->get_row_height() != 0) {
         _log->printDouble("Search Window Edge / Row Height",
-                          _parameter->get_side_length() / _parameter->get_row_height(), 2);
+                          _parameter->get_side_length() / _parameter->get_row_height(), 1);
     }
     if (region_cnt != 0) {
         _log->printDouble("Search Window Average Vertexes(include the element itself)",
-                          region_vertexes_cnt / region_cnt, 2);
+                          region_vertexes_cnt / region_cnt, 1);
     }
-    _log->printPair("Distance Matrix", _distance_matrix.size(), _distance_matrix.size(), 2);
+    _log->printPair("Distance Matrix", _distance_matrix.size(), _distance_matrix.size(), 1);
 }
 
 /**
@@ -1418,19 +1552,36 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
             if (!element_1 || !element_2) {
                 _log->error("Element is not existed", 1, 0);
             } else {
-                if (element_1->isFlipFlop() && element_2->isFlipFlop()) {
+                if ((element_1->isFlipFlop() || element_1->isBuffer()) &&
+                    (element_2->isFlipFlop() || element_2->isBuffer())) {
                     SequentialCluster* cluster = new SequentialCluster("clus_" + element_1->get_name());
-                    SequentialFlipFlop* flipflop_1 = static_cast<SequentialFlipFlop*>(element_1);
-                    SequentialFlipFlop* flipflop_2 = static_cast<SequentialFlipFlop*>(element_2);
-                    flipflop_1->set_cluster(cluster);
-                    flipflop_2->set_cluster(cluster);
+
+                    if (element_1->isFlipFlop()) {
+                        SequentialFlipFlop* flipflop_1 = static_cast<SequentialFlipFlop*>(element_1);
+                        flipflop_1->set_cluster(cluster);
+                    }
+                    if (element_2->isFlipFlop()) {
+                        SequentialFlipFlop* flipflop_2 = static_cast<SequentialFlipFlop*>(element_2);
+                        flipflop_2->set_cluster(cluster);
+                    }
+
+                    if (element_1->isBuffer()) {
+                        SequentialBuffer* buffer_1 = static_cast<SequentialBuffer*>(element_1);
+                        buffer_1->set_cluster(cluster);
+                    }
+
+                    if (element_2->isBuffer()) {
+                        SequentialBuffer* buffer_2 = static_cast<SequentialBuffer*>(element_2);
+                        buffer_2->set_cluster(cluster);
+                    }
+
                     // add flipflop.
                     cluster->addSubElement(element_1);
                     cluster->addSubElement(element_2);
                     clusters.push_back(cluster);
                     SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
                     updateTwoVertexesFusion(vertex_1, vertex_2, cluster_vertex);
-                } else if (element_1->isFlipFlop() && element_2->isCluster()) {
+                } else if ((element_1->isFlipFlop() || element_1->isBuffer()) && element_2->isCluster()) {
                     SequentialCluster* cluster = static_cast<SequentialCluster*>(element_2);
                     cluster->set_name(cluster->get_name() + "+");
                     // cluster size control.
@@ -1439,8 +1590,15 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
                         deleteDistanceMatrix(vertex_2->get_name(), vertex_1->get_name());
                         continue;
                     }
-                    SequentialFlipFlop* flipflop = static_cast<SequentialFlipFlop*>(element_1);
-                    flipflop->set_cluster(cluster);
+                    if (element_1->isFlipFlop()) {
+                        SequentialFlipFlop* flipflop = static_cast<SequentialFlipFlop*>(element_1);
+                        flipflop->set_cluster(cluster);
+                    }
+                    if (element_1->isBuffer()) {
+                        SequentialBuffer* buffer = static_cast<SequentialBuffer*>(element_1);
+                        buffer->set_cluster(cluster);
+                    }
+
                     cluster->addSubElement(element_1);
                     SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
                     updateTwoVertexesFusion(vertex_1, vertex_2, cluster_vertex);
@@ -1454,8 +1612,14 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
                         deleteDistanceMatrix(vertex_2->get_name(), vertex_1->get_name());
                         continue;
                     }
-                    SequentialFlipFlop* flipflop = static_cast<SequentialFlipFlop*>(element_2);
-                    flipflop->set_cluster(cluster);
+                    if (element_2->isFlipFlop()) {
+                        SequentialFlipFlop* flipflop = static_cast<SequentialFlipFlop*>(element_2);
+                        flipflop->set_cluster(cluster);
+                    }
+                    if (element_2->isBuffer()) {
+                        SequentialBuffer* buffer = static_cast<SequentialBuffer*>(element_2);
+                        buffer->set_cluster(cluster);
+                    }
                     cluster->addSubElement(element_2);
                     SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
                     updateTwoVertexesFusion(vertex_2, vertex_1, cluster_vertex);
@@ -1468,8 +1632,8 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
                         deleteDistanceMatrix(vertex_2->get_name(), vertex_1->get_name());
                         continue;
                     }
-                    auto sub_flipflops = cluster_2->get_all_element_vec();
-                    for (auto flipflop : sub_flipflops) {
+                    auto sub_elements = cluster_2->get_all_element_vec();
+                    for (auto flipflop : sub_elements) {
                         cluster->addSubElement(flipflop);
                     }
                     // delete the cluster_2.
@@ -1503,23 +1667,6 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
     }
     clusters.clear();
     return final_clusters;
-}
-
-/**
- * @description: Change the clusters name.
- * @param {*}
- * @return {*}
- * @author: ShiJian Chen
- */
-std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph::changeClusterName(
-    std::map<std::string, std::vector<const SequentialElement*>> clusters) {
-    std::map<std::string, std::vector<const SequentialElement*>> buffer_clusters;
-    int i = 0;
-    for (auto pair : clusters) {
-        buffer_clusters.emplace("buffer_" + std::to_string(i), pair.second);
-        i++;
-    }
-    return buffer_clusters;
 }
 
 /**
@@ -1733,6 +1880,41 @@ void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, Sequ
 }
 
 /**
+ * @description: Update the graph connection base on the cluster.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::updateGraphConnectionFromSubGraph(std::string cluster_name,
+                                                            std::vector<const SequentialElement*> fusion_flipflops,
+                                                            SequentialElement* buffer) {
+    SequentialCluster* cluster = new SequentialCluster(cluster_name);
+
+    SequentialVertex* flipflop_v1 = get_existent_vertex(fusion_flipflops[0]->get_name());
+    SequentialVertex* flipflop_v2 = get_existent_vertex(fusion_flipflops[1]->get_name());
+    SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
+    updateGraphConnection(flipflop_v1, flipflop_v2, cluster_vertex);
+    deleteSequentialVertex(flipflop_v1->get_name());
+    deleteSequentialVertex(flipflop_v2->get_name());
+    add_sequential_vertex(cluster_vertex);
+
+    for (size_t i = 2; i < fusion_flipflops.size(); ++i) {
+        SequentialVertex* flipflop_vertex = get_existent_vertex(fusion_flipflops[i]->get_name());
+        SequentialVertex* past_vertex = get_existent_vertex(cluster->get_name());
+        cluster->set_name(cluster->get_name() + "+");
+        SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
+        updateGraphConnection(flipflop_vertex, past_vertex, cluster_vertex);
+        deleteSequentialVertex(past_vertex->get_name());
+        deleteSequentialVertex(flipflop_vertex->get_name());
+        add_sequential_vertex(cluster_vertex);
+    }
+
+    modifyVertexName(cluster->get_name(), buffer);
+
+    delete cluster;
+}
+
+/**
  * @description: update all ancestors of the vertex_1 and the vertex_2, modifying their descentant. Add
  * fusion_vertex to the list.
  * @param {*}
@@ -1816,6 +1998,23 @@ void SkewConstraintGraph::modifyVertexDescendants(SequentialVertex* vertex_1, Se
         descendant->removeAncestor(vertex_1);
         descendant->removeAncestor(vertex_2);
     }
+}
+
+/**
+ * @description: Modify the vertex name in graph.
+ * @param {string} old_name
+ * @param {SequentialElement*} buffer
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::modifyVertexName(std::string old_name, SequentialElement* buffer) {
+    SequentialVertex* old_vertex = get_existent_vertex(old_name);
+    SequentialVertex* new_vertex = new SequentialVertex(buffer);
+    updateSourceConnection(old_vertex, new_vertex);
+    updateSinkConnection(old_vertex, new_vertex);
+
+    deleteSequentialVertex(old_vertex->get_name());
+    add_sequential_vertex(new_vertex);
 }
 
 }  // namespace itdp

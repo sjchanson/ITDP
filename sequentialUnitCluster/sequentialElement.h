@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-01 20:11:31
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-19 10:27:15
+ * @LastEditTime: 2021-08-24 20:51:44
  * @Description:
  */
 
@@ -38,7 +38,7 @@ public:
     bool isPi() const { return _type == 1; }
     bool isPo() const { return _type == 2; }
     bool isFlipFlop() const { return _type == 3; }
-    bool isLcb() const { return _type == 4; }
+    bool isBuffer() const { return _type == 4; }
     bool isCluster() const { return _type == 5; }
     bool isLogic() const { return _type == 6; }
 
@@ -202,7 +202,7 @@ public:
 
     // setter.
     void set_cluster(SequentialElement* cluster) { _cluster = cluster; }
-    void set_center_coord() {}  // TODO.
+    void set_center_coord(Point<DBU> coord) { _coordinate = coord; }
 
     void resetCluster() { _cluster = nullptr; }
 
@@ -214,7 +214,6 @@ private:
 inline SequentialBuffer::SequentialBuffer(std::string name) {
     _name = name;
     _type = 4;
-    set_center_coord();
 }
 
 class SequentialLogic : public SequentialElement {

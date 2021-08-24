@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 11:57:29
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-23 10:56:36
+ * @LastEditTime: 2021-08-24 20:18:01
  * @Description:
  */
 
@@ -36,7 +36,7 @@ public:
     ~SequentialOperator();
 
     std::map<std::string, std::vector<const SequentialElement*>> get_clusters_map() const { return _clusters_map; }
-    void buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map) {}  // TODO : Top-level Operations.
+    void buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map);
     void sloveInitLevelCluster();
 
 private:

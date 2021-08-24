@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:57:39
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-19 16:12:09
+ * @LastEditTime: 2021-08-24 20:47:56
  * @Description:
  */
 
@@ -437,19 +437,19 @@ void SequentialOperator::sequentialClusterSolve() {
     cleanClusters();
 
     auto map = _skew_constraint_graph->makeVertexesFusion();
-    _clusters_map = _skew_constraint_graph->changeClusterName(map);
+    for (auto pair : map) {
+        std::string buffer_name = "buffer_" + std::to_string(_sequential_base->get_sequential_buffer_size());
+        // add buffer and build the clockTree.
+        SequentialBuffer* buffer = new SequentialBuffer(buffer_name);
+        _sequential_base->add_buffer(buffer, pair.second);
+        // change the vertex name.
+        _skew_constraint_graph->modifyVertexName(pair.first, buffer);
+        // add to the _clusters_map.
+        _clusters_map.emplace(buffer_name, pair.second);
+    }
 
     // reset the sink element's belonging.
     _sequential_base->resetBelonging();
-
-    // build the clockTree.
-    for (auto pair : _clusters_map) {
-        std::string name = pair.first;
-        auto element_vec = pair.second;
-
-        SequentialBuffer* buffer = new SequentialBuffer(name);
-        _sequential_base->add_buffer(buffer, element_vec);
-    }
 }
 
 /**
@@ -459,7 +459,33 @@ void SequentialOperator::sequentialClusterSolve() {
  * @author: ShiJian Chen
  */
 void SequentialOperator::sloveInitLevelCluster() {
-    _clusters_map = _skew_constraint_graph->subgraphPartition(_parameter->get_clus_size());
+    _clusters_map.clear();
+
+    std::map<std::string, std::vector<const SequentialElement*>> tmp_map;
+    tmp_map = _skew_constraint_graph->subgraphPartition(_parameter->get_pre_clus_size());
+
+    // update the origin graph.
+    for (auto pair : tmp_map) {
+        // create the local buffer.
+        std::string buffer_name = "buffer_" + std::to_string(_sequential_base->get_sequential_buffer_size());
+        SequentialBuffer* local_buffer = new SequentialBuffer(buffer_name);
+        _sequential_base->add_buffer(local_buffer, pair.second);
+
+        _skew_constraint_graph->updateGraphConnectionFromSubGraph(buffer_name, pair.second, local_buffer);
+
+        _clusters_map.emplace(buffer_name, pair.second);
+    }
+}
+
+void SequentialOperator::buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map) {
+    // set the new coord of buffer.
+    for (auto pair : _coord_map) {
+        SequentialBuffer* buffer = _sequential_base->get_sequential_buffer(pair.first);
+        buffer->set_center_coord(pair.second);
+    }
+
+    _skew_constraint_graph->initDistanceMatrix();
+    sequentialClusterSolve();
 }
 
 }  // namespace itdp
