@@ -25,8 +25,8 @@ public:
     AdapterInterface(AdapterInterface&&) = delete;
     virtual ~AdapterInterface() {}
 
-    virtual std::vector<Instance*> get_instance_pvec() const = 0;
     virtual std::vector<Net*> get_net_pvec() const = 0;
+    virtual std::vector<Instance*> get_instance_pvec() const = 0;
     virtual std::vector<Pin*> get_pin_pvec() const = 0;
     virtual std::string get_design_name() const = 0;
     virtual double get_core_edge_x() const = 0;

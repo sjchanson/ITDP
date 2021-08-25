@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-24 21:07:47
+ * @LastEditTime: 2021-08-25 12:02:03
  * @Description:
  */
 
@@ -266,9 +266,16 @@ SkewConstraintGraph::~SkewConstraintGraph() {
 
 void SkewConstraintGraph::add_sequential_vertex(SequentialVertex* v) {
     if (v->isStart()) {
-        _start_vertexes.emplace(v->get_name(), v);
+        auto it = _start_vertexes.find(v->get_name());
+        if (it == _start_vertexes.end()) {
+            _start_vertexes.emplace(v->get_name(), v);
+        }
+
     } else if (v->isEnd()) {
-        _end_vertexes.emplace(v->get_name(), v);
+        auto it = _end_vertexes.find(v->get_name());
+        if (it == _end_vertexes.end()) {
+            _end_vertexes.emplace(v->get_name(), v);
+        }
     }
     _sequential_vertexes.emplace(v->get_name(), v);
 }
@@ -898,7 +905,7 @@ void SkewConstraintGraph::hopForwardDFS(std::stack<SequentialVertex*>& stack) {
         return;
     }
 
-    auto edges = current_vertex->get_sink_edges();
+    const auto& edges = current_vertex->get_sink_edges();
     for (size_t i = 0; i < edges.size(); i++) {
         auto next_vertex = edges[i]->get_sink_vertex();
         stack.push(next_vertex);
@@ -956,7 +963,7 @@ void SkewConstraintGraph::initRegion() {
     for (auto it = _sequential_vertexes.begin(); it != _sequential_vertexes.end(); it++) {
         auto current_element = (*it).second->get_node();
         // only consider the flipflop.
-        if (current_element->isFlipFlop()) {
+        if (current_element->isFlipFlop() || current_element->isBuffer()) {
             int x_coord = current_element->get_coord().get_x();
             x_coords.emplace(x_coord);
             add_x_vertex_mapping(x_coord, (*it).second);
@@ -1087,7 +1094,7 @@ void SkewConstraintGraph::initDistanceMatrix() {
     for (auto pair : _sequential_vertexes) {
         auto current_vertex = pair.second;
         // only the flipflop should be considered.
-        if (current_vertex->get_node()->isFlipFlop()) {
+        if (current_vertex->get_node()->isFlipFlop() || current_vertex->get_node()->isBuffer()) {
             search_region = obtainSearchRegion(current_vertex);
             region_vertexes = obtainRegionVertexes(search_region);
             ++region_cnt;
@@ -1282,6 +1289,16 @@ std::map<std::string, double> SkewConstraintGraph::obtainDistanceMap(SequentialV
  * @author: ShiJian Chen
  */
 std::pair<Point<DBU>, Point<DBU>> SkewConstraintGraph::obtainSearchRegion(SequentialVertex* vertex) {
+    // debug.
+    if (vertex->get_node()->isBuffer()) {
+        DBU side_length = 160000;
+        Point<DBU> vertex_coord = vertex->get_node()->get_coord();
+        Point<DBU> lower_point(vertex_coord.get_x() - side_length / 2, vertex_coord.get_y() - side_length / 2);
+        Point<DBU> upper_point(vertex_coord.get_x() + side_length / 2, vertex_coord.get_y() + side_length / 2);
+        std::pair<Point<DBU>, Point<DBU>> region(lower_point, upper_point);
+        return region;
+    }
+
     DBU side_length = _parameter->get_side_length();
     Point<DBU> vertex_coord = vertex->get_node()->get_coord();
     Point<DBU> lower_point(vertex_coord.get_x() - side_length / 2, vertex_coord.get_y() - side_length / 2);

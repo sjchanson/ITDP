@@ -11,6 +11,7 @@
 #pragma once
 
 #include <deque>
+#include <map>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -33,6 +34,14 @@ public:
     //     _skew = vertex->get_skew();
     //   };
     ~ClusterVertex() = default;
+
+    bool isInst() {
+        if (_name.size() <= 10) {
+            return true;
+        }
+        string suffix_name(_name.end() - 10, _name.end());
+        return suffix_name != "transition";
+    }
 
     bool isLegal() { return !_point.isUnLegal(); }
     bool isSink() {
@@ -84,8 +93,10 @@ public:
      * @param buffer_name
      */
 
-    void computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string &buffer_name,
-                                        const unsigned &buffer_site_width);
+    Point<DBU> computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string &buffer_name,
+                                              const unsigned &buffer_site_width);
+
+    // std::map<std::string, Point<DBU>> genMap(std::vector<SingleCluster *> cluster_map);
 
 private:
     /**

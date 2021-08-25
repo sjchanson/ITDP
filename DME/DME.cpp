@@ -102,8 +102,8 @@ DBU DME::skewToDistance(const ClusterVertex *left_point, const ClusterVertex *ri
  * @param buffer_name
  */
 
-void DME::computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string &buffer_name,
-                                         const unsigned &buffer_site_width) {
+Point<DBU> DME::computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string &buffer_name,
+                                               const unsigned &buffer_site_width) {
     /**
      * @brief Compute euclidean center of geometry
      *
@@ -115,7 +115,7 @@ void DME::computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string 
         if (vertex == binary_tree[0]) {
             continue;
         }
-        if (vertex->isBuffer() || vertex->isLCB() || vertex->isSink()) {
+        if (vertex->isInst()) {
             sum_x += vertex->get_point().get_x();
             sum_y += vertex->get_point().get_y();
             ++ceil_num;
@@ -123,7 +123,7 @@ void DME::computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string 
     }
     if (ceil_num == 0) {
         cout << "[CTS-flow] Error: The Cluster " << buffer_name << "has not ceil." << endl;
-        return;
+        return Point<DBU>(-1, -1);
     }
     Point<DBU> center = Point<DBU>(sum_x / ceil_num, sum_y / ceil_num);
     /**
@@ -178,48 +178,48 @@ void DME::computeTpClusterCenterLocation(ClusterTopo &binary_tree, const string 
     // DBU spacing_y = _setting->get_spacing().second;
     // int row_index = (buffer->get_point().get_y() - spacing_y) / row_unit;
     // int site_index = (buffer->get_point().get_x() - spacing_x) / site_unit;
-/**
- * @brief Search the closest index
- *
- */
-//   if (!_setting->checkFeasible(row_index, site_index, buffer_site_width)) {
-//   /**
-//    * @brief In a clockwise direction
-//    * @brief Direction stand for the {row_direction, site_direction}
-//    * @brief {-1, 1} \   {-1, -1}  /  {1, -1} *   {1, 1} *
-//    * @brief          \          /             \       /
-//    * @brief           *        *               \    /
-//    *
-//    */
-//     vector<pair<int, int>> directions = {{-1, 1}, {-1, -1}, {1, -1}, {1, 1}};
-//     int radius = 1;
-//     int row_limit = _setting->get_region_blockage_graph_size().first;
-//     int site_limit = _setting->get_region_blockage_graph_size().second;
-//     while (radius <= 100) {
-//       ++row_index;
-//       for (auto direction : directions) {
-//         int shift = 1;
-//         while (shift <= radius) {
-//           row_index += direction.first;
-//           site_index += direction.second;
-//           if (row_index >= 0 && row_index < row_limit && site_index >= 0 &&
-//             site_index < site_limit &&
-//             _setting->checkFeasible(row_index, site_index,
-//               buffer_site_width)) {
-//             goto Embedding;
-//         }
-//         ++shift;
-//       }
-//     }
-//     ++radius;
-//   }
-//   cout << "[CTS-flow] Error: In the current unit manhattan distance range, "
-//   "embedding work can't be completed, please adjust a more larger "
-//   "range."
-//   << endl;
-//   return;
-// }
-Embedding:
+    /**
+     * @brief Search the closest index
+     *
+     */
+    //   if (!_setting->checkFeasible(row_index, site_index, buffer_site_width)) {
+    //   /**
+    //    * @brief In a clockwise direction
+    //    * @brief Direction stand for the {row_direction, site_direction}
+    //    * @brief {-1, 1} \   {-1, -1}  /  {1, -1} *   {1, 1} *
+    //    * @brief          \          /             \       /
+    //    * @brief           *        *               \    /
+    //    *
+    //    */
+    //     vector<pair<int, int>> directions = {{-1, 1}, {-1, -1}, {1, -1}, {1, 1}};
+    //     int radius = 1;
+    //     int row_limit = _setting->get_region_blockage_graph_size().first;
+    //     int site_limit = _setting->get_region_blockage_graph_size().second;
+    //     while (radius <= 100) {
+    //       ++row_index;
+    //       for (auto direction : directions) {
+    //         int shift = 1;
+    //         while (shift <= radius) {
+    //           row_index += direction.first;
+    //           site_index += direction.second;
+    //           if (row_index >= 0 && row_index < row_limit && site_index >= 0 &&
+    //             site_index < site_limit &&
+    //             _setting->checkFeasible(row_index, site_index,
+    //               buffer_site_width)) {
+    //             goto Embedding;
+    //         }
+    //         ++shift;
+    //       }
+    //     }
+    //     ++radius;
+    //   }
+    //   cout << "[CTS-flow] Error: In the current unit manhattan distance range, "
+    //   "embedding work can't be completed, please adjust a more larger "
+    //   "range."
+    //   << endl;
+    //   return;
+    // }
+    // Embedding:
     /**
      * @brief Embedding the real location and reset the pointer
      *
@@ -231,10 +231,21 @@ Embedding:
      * @brief Add buffer to network
      *
      */
-    cout << "      + PLACED ( " << buffer->get_point().get_x() << " " << buffer->get_point().get_y() << ") N ;" << endl;
-    buffer->set_name(buffer_name);
-    // _clk_network->addClkBuffer(buffer_name,
+    // cout << "      + PLACED ( " << buffer->get_point().get_x() << " " << buffer->get_point().get_y() << ") N ;" <<
+    // endl; buffer->set_name(buffer_name); _clk_network->addClkBuffer(buffer_name,
     //                            "",  // should considered the master name
     //                            buffer->get_point().get_x(),
     //                            buffer->get_point().get_y(), 1);
+    return binary_tree[0]->get_point();
 }
+
+// std::map<std::string, Point<DBU>> DME::genMap(std::map<std::string, std::vector<ClusterVertex *>> cluster_map) {
+//     std::map<std::string, Point<DBU>> tmp;
+
+//     for (auto pair : cluster_map) {
+//         Point<DBU> buffer_coord = computeTpClusterCenterLocation(pair.second, pair.first, 4);
+//         tmp.emplace(pair.first, buffer_coord);
+//     }
+
+//     return tmp;
+// }

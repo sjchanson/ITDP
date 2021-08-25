@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-16 15:42:38
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-19 15:00:38
+ * @LastEditTime: 2021-08-25 11:09:45
  * @Description:
  */
 
@@ -43,7 +43,9 @@ void SingleCluster::buildBinaryTree() {
     // if only a vertex.
     if (remain_vertexes.size() == 1) {
         _perfect_binary_trees.clear();
-        _perfect_binary_trees.push_back((*remain_vertexes.begin()).second);
+        std::string root_name = (*remain_vertexes.begin()).first;
+        ClusterNode* root = _nodes[root_name];
+        buildPerfectBinaryTree(root);
         return;
     }
 

@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-22 15:08:49
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-24 21:00:56
+ * @LastEditTime: 2021-08-25 14:17:40
  * @Description:
  */
 #include <gtest/gtest.h>
@@ -12,7 +12,8 @@
 #include <memory>
 #include <string>
 
-#include "../DME/CtsBase.h"
+#include "../../DME/CtsBase.h"
+#include "../../DME/DME.h"
 #include "/root/iTDP/iccadEstimator/evaluate.h"
 #include "/root/iTDP/sequentialUnitCluster/sequentialOperator.h"
 #include "common/logger.h"
@@ -131,7 +132,7 @@ TEST(SequentialGraph, vertexFusion) {
 
 TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
     string s1 = "benchmark/ICCAD15.parm";
-    string s2 = "benchmark/simple/simple.iccad2015";
+    string s2 = "benchmark/superblue18/superblue18.iccad2015";
 
     auto _circuit = make_shared<circuit>();
     _circuit->read_parameters(s1.c_str());
@@ -146,11 +147,22 @@ TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
 
     opt->sloveInitLevelCluster();
 
-    CtsBase* base = new CtsBase(opt->get_clusters_map());
+    // DME test.
+    while (opt->get_clusters_map().size() > 1) {
+        CtsBase* base = new CtsBase(opt->get_clusters_map());
+        auto clusters = base->get_binary_clusters();
+        std::map<std::string, Point<DBU>> buffer_coords;
 
-    base->get_binary_clusters();
+        for (auto clus : clusters) {
+            auto binary_tree = clus->get_perfect_binary_tree();
+            Point<DBU> buffer_location = DME().computeTpClusterCenterLocation(binary_tree, clus->get_name(), 4);
+            buffer_coords.emplace(clus->get_name(), buffer_location);
+        }
+
+        opt->buildNextLevelCluster(buffer_coords);
+        delete base;
+    }
 
     delete opt;
     delete adapter;
-    delete base;
 }

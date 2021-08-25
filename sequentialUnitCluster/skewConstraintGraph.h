@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:57:50
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-24 20:37:57
+ * @LastEditTime: 2021-08-25 11:30:49
  * @Description:
  */
 
@@ -41,7 +41,7 @@ public:
     SequentialElement* get_node() const { return _node; }
     std::vector<SequentialEdge*> get_src_edges() const { return _src_edges; }
     SequentialEdge* get_src_edge(SequentialVertex* source) const;
-    std::vector<SequentialEdge*> get_sink_edges() const { return _sink_edges; }
+    const std::vector<SequentialEdge*>& get_sink_edges() { return _sink_edges; }
     SequentialEdge* get_sink_edge(SequentialVertex* destination) const;
     std::list<SequentialVertex*> get_ancestors() const { return _ancestors; }
     std::list<SequentialVertex*> get_descendants() const { return _descendants; }
