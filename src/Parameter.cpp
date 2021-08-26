@@ -2,20 +2,20 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-14 14:37:40
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-25 11:50:55
+ * @LastEditTime: 2021-08-26 14:37:34
  * @Description:
  */
-#include "common/parameter.h"
+#include "common/Parameter.h"
 
 namespace itdp {
 
 Parameter::Parameter()
     : _skew_flag(1.0)
-    , _side_length(95000)
+    , _side_length(100000)
     , _extra_dist(0.5)
     , _clus_size(25)
     , _plot_interval(1000000)
-    , _pre_clus_size(100)
+    , _pre_clus_size(200)
     , _lamda(1)
     , _benchmark_path("benchmark")
     , _clean_prefix("clean_")

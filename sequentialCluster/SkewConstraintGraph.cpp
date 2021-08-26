@@ -2,11 +2,11 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-25 12:02:03
+ * @LastEditTime: 2021-08-26 14:56:27
  * @Description:
  */
 
-#include "skewConstraintGraph.h"
+#include "SkewConstraintGraph.h"
 
 #include <limits.h>
 
@@ -942,6 +942,7 @@ void SkewConstraintGraph::hopBackwardDFS(std::stack<SequentialVertex*>& stack) {
     for (size_t i = 0; i < edges.size(); i++) {
         auto front_vertex = edges[i]->get_src_vertex();
         stack.push(front_vertex);
+        // checkoutStack(stack);
         hopBackwardDFS(stack);
 
         // add the vertex hop.
@@ -949,6 +950,25 @@ void SkewConstraintGraph::hopBackwardDFS(std::stack<SequentialVertex*>& stack) {
         current_vertex->add_ancestor(front_vertex);
     }
     stack.pop();
+}
+
+/**
+ * @description: Debug.
+ * @param {stack<SequentialVertex*>} stack
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+void SkewConstraintGraph::checkoutStack(std::stack<SequentialVertex*> stack) {
+    int i = stack.size();
+    auto current_vertex = stack.top();
+    stack.pop();
+    while (!stack.empty()) {
+        auto search_vertex = stack.top();
+        if (*current_vertex == *search_vertex) {
+            _log->warn(current_vertex->get_name() + " has already been add", 1, 0);
+            _log->printInt("Current Stack depth", i, 1);
+        }
+    }
 }
 
 /**
@@ -1290,14 +1310,14 @@ std::map<std::string, double> SkewConstraintGraph::obtainDistanceMap(SequentialV
  */
 std::pair<Point<DBU>, Point<DBU>> SkewConstraintGraph::obtainSearchRegion(SequentialVertex* vertex) {
     // debug.
-    if (vertex->get_node()->isBuffer()) {
-        DBU side_length = 160000;
-        Point<DBU> vertex_coord = vertex->get_node()->get_coord();
-        Point<DBU> lower_point(vertex_coord.get_x() - side_length / 2, vertex_coord.get_y() - side_length / 2);
-        Point<DBU> upper_point(vertex_coord.get_x() + side_length / 2, vertex_coord.get_y() + side_length / 2);
-        std::pair<Point<DBU>, Point<DBU>> region(lower_point, upper_point);
-        return region;
-    }
+    // if (vertex->get_node()->isBuffer()) {
+    //     DBU side_length = 160000;
+    //     Point<DBU> vertex_coord = vertex->get_node()->get_coord();
+    //     Point<DBU> lower_point(vertex_coord.get_x() - side_length / 2, vertex_coord.get_y() - side_length / 2);
+    //     Point<DBU> upper_point(vertex_coord.get_x() + side_length / 2, vertex_coord.get_y() + side_length / 2);
+    //     std::pair<Point<DBU>, Point<DBU>> region(lower_point, upper_point);
+    //     return region;
+    // }
 
     DBU side_length = _parameter->get_side_length();
     Point<DBU> vertex_coord = vertex->get_node()->get_coord();

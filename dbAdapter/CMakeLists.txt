@@ -9,11 +9,12 @@ else()
 endif()
 add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=YES)
 
+# Add head file.
+include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/iccadEstimator)
+
 # Link legacy Libraries
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
-add_library(sequentialUnitCluster SHARED
-            clockTree.cpp
-            sequentialBase.cpp
-            sequentialOperator.cpp
-            skewConstraintGraph.cpp)
+add_library(Adapter SHARED
+            Iccad2015Adapter.cpp)

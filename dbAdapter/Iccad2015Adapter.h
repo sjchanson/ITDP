@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-30 14:20:19
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-25 11:16:09
+ * @LastEditTime: 2021-08-26 14:36:30
  * @Description:
  */
 
@@ -14,14 +14,14 @@
 #include <string>
 #include <vector>
 
-#include "../iccadEstimator/evaluate.h"
-#include "common/logger.h"
-#include "common/parameter.h"
-#include "common/utility.h"
-#include "itdpBase/adapterInterface.h"
-#include "itdpBase/instance.h"
-#include "itdpBase/net.h"
-#include "itdpBase/pin.h"
+#include "AdapterInterface.h"
+#include "Instance.h"
+#include "Net.h"
+#include "Pin.h"
+#include "common/Logger.h"
+#include "common/Parameter.h"
+#include "common/Utility.h"
+#include "evaluate.h"
 
 namespace itdp {
 

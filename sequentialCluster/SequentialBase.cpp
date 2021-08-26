@@ -2,11 +2,11 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:51:11
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-18 20:48:47
+ * @LastEditTime: 2021-08-26 14:40:08
  * @Description:
  */
 
-#include "sequentialBase.h"
+#include "SequentialBase.h"
 
 namespace itdp {
 

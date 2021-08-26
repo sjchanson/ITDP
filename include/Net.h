@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-29 15:54:43
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-07 13:12:00
+ * @LastEditTime: 2021-08-26 14:35:46
  * @Description:
  */
 
@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "../common/utility.h"
-#include "pin.h"
+#include "Pin.h"
+#include "common/Utility.h"
 
 namespace itdp {
 

@@ -2,11 +2,11 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:57:39
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-24 20:47:56
+ * @LastEditTime: 2021-08-26 14:41:44
  * @Description:
  */
 
-#include "sequentialOperator.h"
+#include "SequentialOperator.h"
 
 #include <math.h>
 

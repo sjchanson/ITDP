@@ -2,11 +2,11 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-31 16:51:45
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-12 14:39:34
+ * @LastEditTime: 2021-08-26 14:22:26
  * @Description:
  */
 
-#include "../include/iccad2015Adapter.h"
+#include "Iccad2015Adapter.h"
 
 namespace itdp {
 

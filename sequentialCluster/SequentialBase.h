@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 16:23:00
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-18 20:49:06
+ * @LastEditTime: 2021-08-26 14:40:02
  * @Description:
  */
 
@@ -12,8 +12,8 @@
 #include <map>
 #include <vector>
 
-#include "clockTree.h"
-#include "sequentialElement.h"
+#include "ClockTree.h"
+#include "SequentialElement.h"
 
 namespace itdp {
 

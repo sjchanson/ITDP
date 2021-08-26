@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-29 16:51:20
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-08 18:41:53
+ * @LastEditTime: 2021-08-26 14:35:55
  * @Description:
  */
 
@@ -11,7 +11,7 @@
 
 #include <string>
 
-#include "../common/utility.h"
+#include "common/Utility.h"
 
 // Internal association type.
 namespace itdp {

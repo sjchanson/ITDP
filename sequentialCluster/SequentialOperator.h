@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-03 11:57:29
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-24 20:18:01
+ * @LastEditTime: 2021-08-26 14:38:38
  * @Description:
  */
 
@@ -16,14 +16,14 @@
 #include <string>
 #include <vector>
 
-#include "../include/common/logger.h"
-#include "../include/common/parameter.h"
-#include "../include/common/utility.h"
-#include "../include/itdpBase/adapterInterface.h"
-#include "clockTree.h"
-#include "sequentialBase.h"
-#include "sequentialElement.h"
-#include "skewConstraintGraph.h"
+#include "AdapterInterface.h"
+#include "ClockTree.h"
+#include "SequentialBase.h"
+#include "SequentialElement.h"
+#include "SkewConstraintGraph.h"
+#include "common/Logger.h"
+#include "common/Parameter.h"
+#include "common/Utility.h"
 
 namespace itdp {
 

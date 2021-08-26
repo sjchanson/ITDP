@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-31 16:27:26
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-12 12:10:06
+ * @LastEditTime: 2021-08-26 14:30:37
  * @Description:
  */
 
@@ -12,9 +12,9 @@
 #include <string>
 #include <vector>
 
-#include "instance.h"
-#include "net.h"
-#include "pin.h"
+#include "Instance.h"
+#include "Net.h"
+#include "Pin.h"
 
 namespace itdp {
 

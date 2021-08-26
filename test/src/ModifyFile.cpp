@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-22 15:08:49
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-25 14:17:40
+ * @LastEditTime: 2021-08-26 15:15:09
  * @Description:
  */
 #include <gtest/gtest.h>
@@ -12,13 +12,14 @@
 #include <memory>
 #include <string>
 
-#include "../../DME/CtsBase.h"
-#include "../../DME/DME.h"
-#include "/root/iTDP/iccadEstimator/evaluate.h"
-#include "/root/iTDP/sequentialUnitCluster/sequentialOperator.h"
-#include "common/logger.h"
-#include "common/parameter.h"
-#include "iccad2015Adapter.h"
+#include "AdapterInterface.h"
+#include "CtsBase.h"
+#include "DME.h"
+#include "Iccad2015Adapter.h"
+#include "SequentialOperator.h"
+#include "common/Logger.h"
+#include "common/Parameter.h"
+#include "evaluate.h"
 
 // int argc = 3;
 // string s1 = "modifyDEF";
@@ -30,7 +31,7 @@ using namespace std;
 
 TEST(DataInterface, constructDB) {
     string s1 = "benchmark/ICCAD15.parm";
-    string s2 = "benchmark/superblue18/superblue18.iccad2015";
+    string s2 = "benchmark/simple/simple.iccad2015";
 
     auto _circuit = make_shared<circuit>();
     _circuit->read_parameters(s1.c_str());
@@ -50,7 +51,7 @@ TEST(DataInterface, constructDB) {
 
 TEST(SequentialGraph, buildGraph) {
     string s1 = "benchmark/ICCAD15.parm";
-    string s2 = "benchmark/superblue18/superblue18.iccad2015";
+    string s2 = "benchmark/simple/simple.iccad2015";
 
     auto _circuit = make_shared<circuit>();
     _circuit->read_parameters(s1.c_str());
@@ -149,10 +150,9 @@ TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
 
     // DME test.
     while (opt->get_clusters_map().size() > 1) {
-        CtsBase* base = new CtsBase(opt->get_clusters_map());
-        auto clusters = base->get_binary_clusters();
-        std::map<std::string, Point<DBU>> buffer_coords;
+        auto clusters = CtsBase(opt->get_clusters_map()).get_binary_clusters();
 
+        std::map<std::string, Point<DBU>> buffer_coords;
         for (auto clus : clusters) {
             auto binary_tree = clus->get_perfect_binary_tree();
             Point<DBU> buffer_location = DME().computeTpClusterCenterLocation(binary_tree, clus->get_name(), 4);
@@ -160,7 +160,6 @@ TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
         }
 
         opt->buildNextLevelCluster(buffer_coords);
-        delete base;
     }
 
     delete opt;

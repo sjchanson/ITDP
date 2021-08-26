@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:57:50
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-25 11:30:49
+ * @LastEditTime: 2021-08-26 14:42:22
  * @Description:
  */
 
@@ -21,9 +21,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "../include/common/logger.h"
-#include "../include/common/parameter.h"
-#include "sequentialElement.h"
+#include "SequentialElement.h"
+#include "common/Logger.h"
+#include "common/Parameter.h"
 
 struct SubCluster;  // Transition variable
 
@@ -189,6 +189,8 @@ private:
 
     // initialize the reachable vertexes.
     void hopForwardDFS(std::stack<SequentialVertex*>& stack);
+    void checkoutStack(std::stack<SequentialVertex*> stack);
+
     void hopBackwardDFS(std::stack<SequentialVertex*>& stack);
 
     // region search.

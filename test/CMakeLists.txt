@@ -15,12 +15,19 @@ add_executable(iTDPTest ${SOURCE_FILE})
 link_directories(${CMAKE_SOURCE_DIR}/iccadEstimator/libs)
 message("CURRENT DIRATORY : ${CMAKE_SOURCE_DIR}")
 
+# Add head file.
+include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/DME)
+include_directories(${CMAKE_SOURCE_DIR}/dbAdapter)
+include_directories(${CMAKE_SOURCE_DIR}/iccadEstimator)
+include_directories(${CMAKE_SOURCE_DIR}/sequentialCluster)
+
 target_link_libraries(
     iTDPTest
     PUBLIC
     iTDP
     iccadEstimator
-    sequentialUnitCluster
+    sequentialCluster
     # flute
     # ui-timer
     ${GTEST_BOTH_LIBRARIES}

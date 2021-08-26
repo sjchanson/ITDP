@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-01 20:11:31
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-24 20:51:44
+ * @LastEditTime: 2021-08-26 14:41:14
  * @Description:
  */
 
@@ -15,8 +15,8 @@
 #include <string>
 #include <vector>
 
-#include "../include/common/utility.h"
-#include "../include/itdpBase/adapterInterface.h"
+#include "AdapterInterface.h"
+#include "common/Utility.h"
 
 namespace itdp {
 

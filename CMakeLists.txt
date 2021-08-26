@@ -29,7 +29,8 @@ SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -std=c++17 -no-pie -O0 -Wall -g2 -ggdb
 
 # # Set
 # SET(FLUTE_HOME ${PROJECT_SOURCE_DIR}/Flute)
-SET(CLUSTER_HOME ${PROJECT_SOURCE_DIR}/sequentialUnitCluster)
+SET(ADAPTER_HOME ${PROJECT_SOURCE_DIR}/dbAdapter)
+SET(CLUSTER_HOME ${PROJECT_SOURCE_DIR}/sequentialCluster)
 # SET(REVISE_HOME ${PROJECT_SOURCE_DIR}/reviseFile)
 SET(GOOGLETEST_HOME ${PROJECT_SOURCE_DIR}/test)
 
@@ -45,8 +46,10 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # # Directory
 # add_subdirectory(${FLUTE_HOME})
+add_subdirectory(${ADAPTER_HOME})
 add_subdirectory(${CLUSTER_HOME})
 add_subdirectory(${PROJECT_SOURCE_DIR}/DME)
+
 # add_subdirectory(${REVISE_HOME})
 # aux_source_directory(${PROJECT_SOURCE_DIR}/src DIR_SRCS)
 
@@ -72,13 +75,13 @@ link_directories(${PROJECT_SOURCE_DIR}/iccadEstimator/libs)
 #     target_link_libraries(${PROJECT_NAME} reviseFile)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/iccadEstimator)
-add_library(${PROJECT_NAME} 
-            ./src/iccad2015Adapter.cpp 
-            ./src/logger.cpp
-            ./src/parameter.cpp
+add_library(${PROJECT_NAME}  
+            ./src/Logger.cpp
+            ./src/Parameter.cpp
 )
 target_link_libraries(${PORJECT_NAME} iccadEstimator)
-target_link_libraries(${PORJECT_NAME} sequentialUnitCluster)
+target_link_libraries(${PROJECT_NAME} Adapter)
+target_link_libraries(${PORJECT_NAME} sequentialCluster)
 target_link_libraries(${PROJECT_NAME} DME)
 
 

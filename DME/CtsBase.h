@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-16 15:42:30
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-19 13:18:55
+ * @LastEditTime: 2021-08-26 14:48:34
  * @Description:
  */
 
@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "../sequentialUnitCluster/sequentialElement.h"
+#include "../sequentialCluster/SequentialElement.h"
 #include "DME.h"
 
 struct ClusterVertexPair {

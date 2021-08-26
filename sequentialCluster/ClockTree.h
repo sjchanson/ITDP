@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:34:58
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-18 20:50:41
+ * @LastEditTime: 2021-08-26 14:40:46
  * @Description:
  */
 
@@ -11,7 +11,7 @@
 
 #include <vector>
 
-#include "sequentialElement.h"
+#include "SequentialElement.h"
 
 namespace itdp {
 

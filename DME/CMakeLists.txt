@@ -7,6 +7,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 else()
     message(FATAL_ERROR "G++ NOT FOUND")
 endif()
+
+# Add head file.
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
 add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=YES)
 
 # Link legacy Libraries
