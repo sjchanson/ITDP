@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:57:39
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-30 11:31:46
+ * @LastEditTime: 2021-08-30 14:14:34
  * @Description:
  */
 
@@ -477,7 +477,14 @@ void SequentialOperator::sloveInitLevelCluster() {
     }
 }
 
+/**
+ * @description: Build the next level.
+ * @param {map<std::string, Point<DBU>>} _coord_map
+ * @return {*}
+ * @author: ShiJian Chen
+ */
 void SequentialOperator::buildNextLevelCluster(std::map<std::string, Point<DBU>> _coord_map) {
+    _clusters_map.clear();
     // set the new coord of buffer.
     for (auto pair : _coord_map) {
         SequentialBuffer* buffer = _sequential_base->get_sequential_buffer(pair.first);
