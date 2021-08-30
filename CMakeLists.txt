@@ -40,8 +40,10 @@ SET(GOOGLETEST_HOME ${PROJECT_SOURCE_DIR}/test)
 # add_definitions(-DPORTFILE=\"${FLUTE_HOME}/PORT9.dat\")
 
 # # Header file directory
-include_directories(${CMAKE_SOURCE_DIR}/include)
-# # include_directories(${CMAKE_SOURCE_DIR}/include/common)
+include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/iCTS/include)
+
+# # include_directories(${PROJECT_SOURCE_DIR}/include/common)
 
 
 # # Directory
@@ -61,9 +63,9 @@ link_directories(${PROJECT_SOURCE_DIR}/iccadEstimator/libs)
 #     add_library(${PROJECT_NAME} ${DIR_SRCS})
 #     message("BUILD LIBRARY ONLY")
 #     # Unit testing setup
-    add_subdirectory(${GOOGLETEST_HOME})
+    # add_subdirectory(${GOOGLETEST_HOME})
 #     # start test
-    enable_testing()
+    # enable_testing()
 # else()
 #     add_executable(${PROJECT_NAME} ${PROJECT_SOURCE_DIR}/main.cpp ${DIR_SRCS})
 #         message("BUILD BINARY")

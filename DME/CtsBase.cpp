@@ -135,10 +135,10 @@ void SingleCluster::makeInitBinaryVertexes(std::map<std::string, ClusterVertex*>
         auto element_1 = pair.element_1;
         auto element_2 = pair.element_2;
         if (isElementRemain(remain_elements, element_1)) {
-            vertex_1 = makeClusterVertex(element_1->get_name(), element_1->get_coord());
+            vertex_1 = makeClusterVertex(element_1->get_name(), icts::Point<icts::DBU>(element_1->get_coord().get_x(),element_1->get_coord().get_y()));
         }
         if (isElementRemain(remain_elements, element_2)) {
-            vertex_2 = makeClusterVertex(element_2->get_name(), element_2->get_coord());
+            vertex_2 = makeClusterVertex(element_2->get_name(), icts::Point<icts::DBU>(element_2->get_coord().get_x(),element_2->get_coord().get_y()));
         }
         if (vertex_1 && vertex_2) {
             auto transition_v = updateVertexFusion(vertex_1, vertex_2, pair.skew, 0);
@@ -153,7 +153,7 @@ void SingleCluster::makeInitBinaryVertexes(std::map<std::string, ClusterVertex*>
     // deal with the remain element.
     for (auto pair : remain_elements) {
         auto element = pair.second;
-        ClusterVertex* vertex = makeClusterVertex(element->get_name(), element->get_coord());
+        ClusterVertex* vertex = makeClusterVertex(element->get_name(), icts::Point<icts::DBU>(element->get_coord().get_x(),element->get_coord().get_y()));
         remain_vertexes.emplace(vertex->get_name(), vertex);
     }
 

@@ -9,7 +9,8 @@ else()
 endif()
 
 # Add head file.
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/src/iCTS/include)
 
 add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=YES)
 
@@ -17,5 +18,4 @@ add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=YES)
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
 add_library(DME SHARED
-            CtsBase.cpp
-            DME.cpp)   
+            CtsBase.cpp)   

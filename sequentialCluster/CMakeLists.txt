@@ -10,7 +10,8 @@ endif()
 add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=YES)
 
 # include the head file.
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/include)
+message(${PROJECT_SOURCE_DIR}++++)
 
 # Link legacy Libraries
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)

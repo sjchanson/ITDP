@@ -26,6 +26,9 @@
 
 #include <iostream>
 
+
+
+namespace itdp {
 double microtime();
 
 typedef long long DBU;
@@ -76,3 +79,5 @@ private:
     T _x;
     T _y;
 };
+}
+
