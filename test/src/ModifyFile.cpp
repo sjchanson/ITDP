@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-07-22 15:08:49
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-26 15:15:09
+ * @LastEditTime: 2021-08-26 17:08:14
  * @Description:
  */
 #include <gtest/gtest.h>
@@ -150,7 +150,8 @@ TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
 
     // DME test.
     while (opt->get_clusters_map().size() > 1) {
-        auto clusters = CtsBase(opt->get_clusters_map()).get_binary_clusters();
+        CtsBase* base = new CtsBase(opt->get_clusters_map());
+        auto clusters = base->get_binary_clusters();
 
         std::map<std::string, Point<DBU>> buffer_coords;
         for (auto clus : clusters) {
@@ -160,6 +161,7 @@ TEST(PerfectBinaryTree, constructPerfectBinaryTree) {
         }
 
         opt->buildNextLevelCluster(buffer_coords);
+        delete base;
     }
 
     delete opt;

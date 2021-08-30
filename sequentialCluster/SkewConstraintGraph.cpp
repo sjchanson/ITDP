@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 15:29:55
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-26 14:56:27
+ * @LastEditTime: 2021-08-30 11:32:16
  * @Description:
  */
 
@@ -306,6 +306,14 @@ std::vector<SequentialVertex*> SkewConstraintGraph::get_end_vertexes() const {
     return vertexes;
 }
 
+std::vector<SequentialVertex*> SkewConstraintGraph::get_all_vertexes() const {
+    std::vector<SequentialVertex*> vertexes;
+    for (auto v : _sequential_vertexes) {
+        vertexes.push_back(v.second);
+    }
+    return vertexes;
+}
+
 void SkewConstraintGraph::add_x_vertex_mapping(int x, SequentialVertex* v) {
     auto it = _x_to_vertexes.find(x);
     if (it == _x_to_vertexes.end()) {
@@ -379,19 +387,19 @@ std::map<std::string, std::vector<const SequentialElement*>> SkewConstraintGraph
     int max_subgraph_size) {
     std::map<int, SubCluster*> sub_clusters;
     std::vector<SkewConstraintGraph*> sub_graphs;
-    std::vector<SequentialVertex*> flipflop_vertexes;
+    std::vector<SequentialVertex*> sink_vertexes;
 
     // obtain the flipflop vertexes.
     for (auto pair : _sequential_vertexes) {
-        if (pair.second->get_node()->isFlipFlop()) {
-            flipflop_vertexes.push_back(pair.second);
+        if (pair.second->get_node()->isFlipFlop() || pair.second->get_node()->isBuffer()) {
+            sink_vertexes.push_back(pair.second);
         }
     }
 
     std::vector<SequentialEdge*> ascend_skew_edges = sortEdgeBySkew();
     // classification.
     std::vector<SequentialVertex*> remain_vertexes;
-    remain_vertexes = subClusterClassification(ascend_skew_edges, sub_clusters, max_subgraph_size, flipflop_vertexes);
+    remain_vertexes = subClusterClassification(ascend_skew_edges, sub_clusters, max_subgraph_size, sink_vertexes);
     // Move the single cell into cluster.
     subClusterCompletion(sub_clusters, remain_vertexes);
     // balance the sub clusters.
@@ -495,6 +503,26 @@ void SkewConstraintGraph::subClusterBalance(std::map<int, SubCluster*>& sub_clus
         delete cluster;
     }
 
+    auto sub_vertexes_vec = sortClusters(reunion_vertexes, max_subgraph_size);
+
+    for (auto sub_vertexes : sub_vertexes_vec) {
+        SubCluster* sub_cluster = new SubCluster(++max_idx);
+        sub_cluster->sub_vertexes = sub_vertexes;
+        sub_clusters.emplace(sub_cluster->idx, sub_cluster);
+    }
+}
+
+/**
+ * @description: Sort the clusters.
+ * @param {*}
+ * @return {*}
+ * @author: ShiJian Chen
+ */
+std::vector<std::vector<SequentialVertex*>> SkewConstraintGraph::sortClusters(
+    std::vector<SequentialVertex*> reunion_vertexes, int max_subgraph_size) {
+    //
+    std::vector<std::vector<SequentialVertex*>> sub_clusters;
+
     int grid_size = std::sqrt(reunion_vertexes.size() / max_subgraph_size);
     int x_interval = reunion_vertexes.size() / (grid_size + 1);
     int y_interval = max_subgraph_size;
@@ -560,18 +588,16 @@ void SkewConstraintGraph::subClusterBalance(std::map<int, SubCluster*>& sub_clus
         for (auto y_coord : y_coords_vec) {
             auto vertex_vec = y_to_vertexes[y_coord];
             if (tmp_vec.size() + vertex_vec.size() > static_cast<size_t>(y_interval)) {
-                SubCluster* sub_cluster = new SubCluster(++max_idx);
-                sub_cluster->sub_vertexes = tmp_vec;
-                sub_clusters.emplace(sub_cluster->idx, sub_cluster);
+                sub_clusters.push_back(tmp_vec);
                 tmp_vec.clear();
             }
             tmp_vec.insert(tmp_vec.end(), vertex_vec.begin(), vertex_vec.end());
         }
-        SubCluster* sub_cluster = new SubCluster(++max_idx);
-        sub_cluster->sub_vertexes = tmp_vec;
-        sub_clusters.emplace(sub_cluster->idx, sub_cluster);
+        sub_clusters.push_back(tmp_vec);
         tmp_vec.clear();
     }
+
+    return sub_clusters;
 }
 
 /**
@@ -597,7 +623,7 @@ std::vector<SequentialEdge*> SkewConstraintGraph::sortEdgeBySkew() {
  */
 std::vector<SequentialVertex*> SkewConstraintGraph::subClusterClassification(
     std::vector<SequentialEdge*> edges, std::map<int, SubCluster*>& sub_clusters, int max_subgraph_size,
-    std::vector<SequentialVertex*> flipflop_vertexes) {
+    std::vector<SequentialVertex*> sink_vertexes) {
     int subcluster_id = 0;
     std::vector<SequentialVertex*> remain_vertexes;
     std::map<std::string, int> vertex_to_subcluster;
@@ -668,7 +694,7 @@ std::vector<SequentialVertex*> SkewConstraintGraph::subClusterClassification(
             }
         }
     }
-    for (auto v : flipflop_vertexes) {
+    for (auto v : sink_vertexes) {
         // the vertex has not belonged to a subcluster.
         if (vertex_to_subcluster.find(v->get_name()) == vertex_to_subcluster.end()) {
             remain_vertexes.push_back(v);
@@ -1923,20 +1949,27 @@ void SkewConstraintGraph::updateGraphConnection(SequentialVertex* vertex_1, Sequ
  * @author: ShiJian Chen
  */
 void SkewConstraintGraph::updateGraphConnectionFromSubGraph(std::string cluster_name,
-                                                            std::vector<const SequentialElement*> fusion_flipflops,
+                                                            std::vector<const SequentialElement*> fusion_elements,
                                                             SequentialElement* buffer) {
+    // one sink case.
+    // if (fusion_elements.size() == 1) {
+    //     // change the graph.
+    //     modifyVertexName(fusion_elements[0]->get_name(), buffer);
+    //     return;
+    // }
+
     SequentialCluster* cluster = new SequentialCluster(cluster_name);
 
-    SequentialVertex* flipflop_v1 = get_existent_vertex(fusion_flipflops[0]->get_name());
-    SequentialVertex* flipflop_v2 = get_existent_vertex(fusion_flipflops[1]->get_name());
+    SequentialVertex* flipflop_v1 = get_existent_vertex(fusion_elements[0]->get_name());
+    SequentialVertex* flipflop_v2 = get_existent_vertex(fusion_elements[1]->get_name());
     SequentialVertex* cluster_vertex = new SequentialVertex(cluster);
     updateGraphConnection(flipflop_v1, flipflop_v2, cluster_vertex);
     deleteSequentialVertex(flipflop_v1->get_name());
     deleteSequentialVertex(flipflop_v2->get_name());
     add_sequential_vertex(cluster_vertex);
 
-    for (size_t i = 2; i < fusion_flipflops.size(); ++i) {
-        SequentialVertex* flipflop_vertex = get_existent_vertex(fusion_flipflops[i]->get_name());
+    for (size_t i = 2; i < fusion_elements.size(); ++i) {
+        SequentialVertex* flipflop_vertex = get_existent_vertex(fusion_elements[i]->get_name());
         SequentialVertex* past_vertex = get_existent_vertex(cluster->get_name());
         cluster->set_name(cluster->get_name() + "+");
         SequentialVertex* cluster_vertex = new SequentialVertex(cluster);

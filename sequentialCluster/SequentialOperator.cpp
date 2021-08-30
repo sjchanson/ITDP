@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 19:57:39
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-26 14:41:44
+ * @LastEditTime: 2021-08-30 11:31:46
  * @Description:
  */
 
@@ -484,8 +484,38 @@ void SequentialOperator::buildNextLevelCluster(std::map<std::string, Point<DBU>>
         buffer->set_center_coord(pair.second);
     }
 
-    _skew_constraint_graph->initDistanceMatrix();
-    sequentialClusterSolve();
+    auto sub_clusters_vec =
+        _skew_constraint_graph->sortClusters(_skew_constraint_graph->get_all_vertexes(), _parameter->get_clus_size());
+
+    // pick up the load elements.
+    std::vector<const SequentialElement*> load_elements;
+    for (auto sub_clusters : sub_clusters_vec) {
+        load_elements.clear();
+        for (auto sub_vertex : sub_clusters) {
+            load_elements.push_back(sub_vertex->get_node());
+        }
+
+        // prevent the one element case.
+        if (load_elements.size() == 1) {
+            continue;
+        }
+
+        std::string buffer_name = "buffer_" + std::to_string(_sequential_base->get_sequential_buffer_size());
+        SequentialBuffer* buffer = new SequentialBuffer(buffer_name);
+        _sequential_base->add_buffer(buffer, load_elements);
+
+        _skew_constraint_graph->updateGraphConnectionFromSubGraph(buffer_name, load_elements, buffer);
+
+        _clusters_map.emplace(buffer_name, load_elements);
+    }
+
+    // need to partition again.
+    // if (_skew_constraint_graph->get_sequential_vertexes_size() > 1000) {
+    //     auto tmp_map = _skew_constraint_graph->subgraphPartition(_parameter->get_pre_clus_size());
+    //     return;
+    // }
+    // _skew_constraint_graph->initDistanceMatrix();
+    // sequentialClusterSolve();
 }
 
 }  // namespace itdp

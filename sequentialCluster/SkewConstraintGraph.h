@@ -2,7 +2,7 @@
  * @Author: ShiJian Chen
  * @Date: 2021-08-04 13:57:50
  * @LastEditors: Shijian Chen
- * @LastEditTime: 2021-08-26 14:42:22
+ * @LastEditTime: 2021-08-27 22:08:33
  * @Description:
  */
 
@@ -128,6 +128,8 @@ public:
     std::vector<SequentialVertex*> get_end_vertexes() const;
     bool isEndVertex(std::string name) const;
 
+    std::vector<SequentialVertex*> get_all_vertexes() const;
+
     // setter.
     void add_sequential_vertex(SequentialVertex* v);
     void add_sequential_edge(SequentialEdge* e);
@@ -147,6 +149,9 @@ public:
     void modifyVertexName(std::string old_name, SequentialElement* buffer);
 
     std::map<std::string, std::vector<const SequentialElement*>> makeVertexesFusion();
+
+    std::vector<std::vector<SequentialVertex*>> sortClusters(std::vector<SequentialVertex*> reunion_vertexes,
+                                                             int max_subgraph_size);
 
 private:
     std::string _name;
